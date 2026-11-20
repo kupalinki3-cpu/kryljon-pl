@@ -1,0 +1,17 @@
+name = "glebia"
+main = "src/index.js"
+# Data zgodności wpisana ręcznie; nie była sprawdzana w workerd (brak dostępu do sieci w sesji budującej).
+compatibility_date = "2025-01-01"
+
+# Pliki z public/ serwuje platforma; /api/* nie ma pasujących plików, więc trafia do Workera.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "glebia"
+# NIEUSTAWIONE: wstaw id z `npx wrangler d1 create glebia`.
+database_id = "UNSET-run-wrangler-d1-create"
+
+# Sekret dla /api/admin/unmatched ustaw komendą: npx wrangler secret put ADMIN_TOKEN

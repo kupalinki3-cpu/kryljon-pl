@@ -1,0 +1,15 @@
+{
+  "name": "glebia",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Głębia: codzienna polska gra o najrzadszych odpowiedziach (Cloudflare Worker + D1)",
+  "scripts": {
+    "test": "node --test --no-warnings test/*.test.js",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create glebia",
+    "db:migrate:local": "wrangler d1 migrations apply glebia --local",
+    "db:migrate:remote": "wrangler d1 migrations apply glebia --remote"
+  }
+}
