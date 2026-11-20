@@ -6,6 +6,7 @@
   "description": "Głębia: codzienna polska gra o najrzadszych odpowiedziach (Cloudflare Worker + D1)",
   "scripts": {
     "test": "node --test --no-warnings test/*.test.js",
+    "start": "node --no-warnings server.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create glebia",

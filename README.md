@@ -10,6 +10,7 @@ Stos: Cloudflare Worker + D1 + pliki statyczne z `public/`. Bez zależności w r
 
 ```
 npm test                      # 27 testów: silnik, treść, API na symulowanym D1
+npm start                     # gra lokalnie na http://localhost:8787, bez Cloudflare
 npx wrangler d1 create glebia # wpisz zwrócone database_id do wrangler.toml
 npm run db:migrate:local      # migracje lokalnie
 npm run dev                   # wrangler dev

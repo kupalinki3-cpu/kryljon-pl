@@ -1,6 +1,6 @@
 # Głębia: uruchomienie krok po kroku
 
-Dwa tryby: **lokalnie** (do grania i testów, bez konta) i **na Cloudflare** (żeby gra była w sieci). Zacznij od lokalnego.
+Dwa tryby: **lokalnie** (do grania, bez konta i bez wranglera) i **na Cloudflare** (żeby gra była w sieci). Zacznij od lokalnego.
 
 Co było sprawdzone, a co nie: testy (`npm test`) i front w Chrome przeszły na Linuksie z symulowanym D1. Samo `wrangler dev` i deploy na Cloudflare nie były uruchamiane przez autora, więc pierwszy raz mogą pokazać błąd. Wtedy wklej komunikat.
 
@@ -41,7 +41,7 @@ nvm install 22
 nix-shell
 ```
 
-`shell.nix` daje Node 22 i `steam-run-free` (potrzebny do `workerd`). Dev uruchamiasz przez `steam-run npm run dev`.
+`shell.nix` daje Node 22 i `steam-run-free` (potrzebny do `workerd`). Do trybu lokalnego (`npm start`) wystarczy sam Node. `steam-run` potrzebny jest tylko dla `wrangler dev`.
 
 ## 2. Lokalnie
 
@@ -56,13 +56,14 @@ Oczekiwany wynik: `# pass 27`, `# fail 0`.
 Uruchomienie gry:
 
 ```
-npm run db:migrate:local
-npm run dev
+npm start
 ```
 
-Otwórz `http://localhost:8787`. (NixOS: `steam-run npm run dev`.)
+Otwórz `http://localhost:8787`. To wszystko: bez wranglera, bez konta Cloudflare, bez `workerd` (działa też na NixOS bez `steam-run`). Baza jest w pliku `data/glebia.sqlite` i przetrwa restart. Żeby zagrać od nowa, usuń katalog `data/`. Inny port: `PORT=3000 npm start` (PowerShell: `$env:PORT=3000; npm start`).
 
-Lokalna baza D1 to plik w katalogu `.wrangler/`. Jeśli chcesz zagrać od nowa, usuń ten katalog i zrób migrację jeszcze raz. W `wrangler.toml` zostaje na razie placeholder `database_id`; przy lokalnym D1 powinien wystarczyć (niesprawdzone).
+Opcjonalnie `ADMIN_TOKEN=cos npm start` otwiera lokalnie endpoint z części 5.
+
+`npm start` uruchamia ten sam kod gry co wersja na Cloudflare, tylko na zwykłym Node z SQLite w pliku. Nie sprawdza więc samego środowiska Cloudflare (`npm run dev` przez wrangler to robi, ale jest opcjonalne).
 
 ## 3. Logowanie do Cloudflare i wdrożenie
 
@@ -131,7 +132,9 @@ curl -H "Authorization: Bearer TWOJ_ADMIN_TOKEN" "https://glebia.<twoja-nazwa>.w
 |---|---|
 | `running scripts is disabled` | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` albo `npm.cmd` |
 | `npm test` wywala się na `node:sqlite` | Node jest za stary, zainstaluj 22+ |
-| `wrangler dev` nie startuje na NixOS | użyj `steam-run npm run dev` |
+| `wrangler dev` nie startuje na NixOS | graj przez `npm start`, albo użyj `steam-run npm run dev` |
+| `npm error Missing script: "start"` | zrób `git pull`, skrypt `start` dodano później |
+| `A database with that name already exists` | baza `glebia` już jest, nie twórz jej drugi raz, tylko wklej jej `database_id` (`npx wrangler d1 list`) |
 | `Authentication error` przy deployu | `npx wrangler login` jeszcze raz |
 | `database_id` / `D1_ERROR` | sprawdź, czy wkleiłeś `database_id` do `wrangler.toml` i wykonałeś migrację |
 | Zła godzina "nowych pytań" | dzień liczy się w strefie Europe/Warsaw, o północy |
