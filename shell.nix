@@ -5,7 +5,7 @@
 pkgs.mkShell {
   packages = [
     pkgs.nodejs_22
-    pkgs.steam-run
+    pkgs.steam-run-free
   ];
 
   shellHook = ''
