@@ -1,5 +1,7 @@
 # Głębia
 
+Krok po kroku (Windows, Linux, NixOS, logowanie do Cloudflare): [TUTORIAL.md](TUTORIAL.md).
+
 Codzienna polska gra w stylu Krillion: 7 pytań dziennie, 25 sekund na odpowiedź. Im rzadsza odpowiedź, tym więcej punktów i tym głębiej schodzi haczyk (10 m za punkt, maks. 7000 m). Ranking dzienny (Dziś / Wczoraj), anonimowi gracze z pseudonimem.
 
 Stos: Cloudflare Worker + D1 + pliki statyczne z `public/`. Bez zależności w runtime.
