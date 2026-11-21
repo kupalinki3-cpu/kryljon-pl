@@ -11,7 +11,6 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "glebia"
-# NIEUSTAWIONE: wstaw id z `npx wrangler d1 create glebia`.
-database_id = "UNSET-run-wrangler-d1-create"
+database_id = "f5e5d9b3-9415-41e2-9f66-53222547c70c"
 
 # Sekret dla /api/admin/unmatched ustaw komendą: npx wrangler secret put ADMIN_TOKEN
