@@ -16,7 +16,7 @@
   <div class="crt" aria-hidden="true"></div>
 
   <header class="hud">
-    <button type="button" id="menu-btn" class="btn ghost icon" aria-label="Ranking dnia">☰</button>
+    <button type="button" id="menu-btn" class="btn ghost icon" aria-label="Menu gry" title="Menu gry">☰</button>
     <div class="hud-box">
       <span class="hud-label">Głębokość</span>
       <span class="hud-val cyan" id="hud-depth">0 m</span>
@@ -51,7 +51,7 @@
           <div class="modes">
             <button type="submit" class="btn mode" id="start-daily">
               <b id="daily-title">Gra rankingowa</b>
-              <small id="daily-sub">Polskie pytania, raz dziennie</small>
+              <small id="daily-sub">Polskie pytania, 3 podejścia dziennie</small>
             </button>
             <button type="button" class="btn cyan mode" id="start-free">
               <b>Gra swobodna</b>
@@ -139,6 +139,7 @@
       <i class="screen-art podium" aria-hidden="true"></i>
       <button type="button" class="btn ghost icon" id="board-close" aria-label="Zamknij ranking">✕</button>
     </div>
+    <button type="button" id="restart-free" class="btn cyan" hidden>Od nowa</button>
     <div class="tabs" role="tablist">
       <button type="button" role="tab" id="tab-today" aria-selected="true">Dziś</button>
       <button type="button" role="tab" id="tab-yesterday" aria-selected="false">Wczoraj</button>

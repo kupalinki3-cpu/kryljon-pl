@@ -27,6 +27,7 @@ import polskieKategorie from './polskie-kategorie.js';
 import { terytCategories, terytExtras } from './teryt.js';
 import produktyTradycyjne from './produkty-tradycyjne.js';
 import uzupPopularne from './uzup-popularne.js';
+import uzupSprawdzone from './uzup-sprawdzone.js';
 import { wikiCategories, wikiExtras } from './uzup-wikipedia.js';
 import { normalize } from '../game.js';
 
@@ -35,7 +36,7 @@ const uzupelnienia = {};
 for (const part of [
   uzupelnieniaPodstawowe, uzupPrzyroda, uzupKultura, uzupLudzie, uzupReszta, uzupNet,
   uzupMasa, uzupMasa2, uzupMasa3, uzupMasa4, uzupMasa5, uzupPopularne, uzupWirale,
-  terytExtras, produktyTradycyjne, wikiExtras, uzupKraj, uzupKulturaPolska, uzupLudziePolska, uzupPolon,
+  terytExtras, produktyTradycyjne, wikiExtras, uzupKraj, uzupKulturaPolska, uzupLudziePolska, uzupPolon, uzupSprawdzone,
 ]) {
   for (const [id, list] of Object.entries(part)) uzupelnienia[id] = [...(uzupelnienia[id] ?? []), ...list];
 }

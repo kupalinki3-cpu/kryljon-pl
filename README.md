@@ -6,8 +6,8 @@ Polska gra w stylu Krillion: 7 pytań, 25 sekund na odpowiedź. Każda odpowied�
 
 Tryby gry:
 
-- **rankingowy**: raz dziennie, te same pytania dla wszystkich, ranking Dziś / Wczoraj, anonimowi gracze z pseudonimem;
-- **swobodny**: losowe pytania z polskiej bazy, bez rankingu.
+- **rankingowy**: do trzech podejść dziennie, te same pytania dla wszystkich. W rankingu Dziś / Wczoraj widnieje najlepszy ukończony wynik gracza.
+- **swobodny**: losowe pytania z polskiej bazy, bez rankingu. W trakcie nurkowania otwórz menu i wybierz „Od nowa”, aby wylosować nowy zestaw.
 
 Odpowiedź, której nie ma w bazie, nie kończy pytania („brak echa”): można próbować dalej, dopóki płynie czas. W kategorii polskich memów wpisz nazwę mema, tytuł filmiku albo jego rozpoznawalny cytat. Gra sprawdza listę odpowiedzi i aliasów, np. „Ale urwał” i „ale urwal ale to bylo dobre” prowadzą do tego samego wpisu.
 
@@ -36,7 +36,7 @@ Wersje wranglera i `compatibility_date` w `wrangler.toml` nie były tu sprawdzan
 - **Głębokości są redakcyjne i niekalibrowane.** Wpis w treści ma postać `[metry, "nazwa", ...aliasy]`; pomocniki `group`, `cat` i `jit` z `src/content/util.js` zapisują grupy wpisów o podobnej głębokości (z deterministycznym rozrzutem ±20%). Pasma na ekranie: do 200 m „Każdy zna”, do 500 „Znane”, do 1500 „Niezłe”, do 4000 „Rzadkie”, do 10000 „Głębinowe”, dalej „Legenda głębin”. Punkty to metry / 10.
 - **Brak echa:** nieznana odpowiedź nie jest zapisywana jako wynik, zegar biegnie dalej, a próba trafia do tabeli `misses` (maks. 40 prób na pytanie). Gdy czas minie bez trafienia, pytanie liczy się jako 0 m.
 - **Tryb swobodny:** losowe pytania zapisane w `runs.prompts`, limit 60 nowych gier na godzinę na gracza, wyniki poza rankingiem.
-- **Tożsamość:** token w localStorage, w bazie tylko jego skrót SHA-256. Wyczyszczenie localStorage pozwala zagrać drugi raz tego samego dnia.
+- **Tożsamość:** token w localStorage, w bazie tylko jego skrót SHA-256.
 
 ## Rozbudowa bazy
 
@@ -47,11 +47,13 @@ Baza jest punktem startowym i rośnie razem z graczami: nie zna wszystkiego, co 
 - `src/game.js` – czysta logika (normalizacja, dopasowanie, daty, losowanie)
 - `src/index.js` – API Workera
 - `src/content/` – 54 kategorie związane z Polską, ponad 11 600 odpowiedzi i ich aliasy. Dane geograficzne pochodzą m.in. z [rejestru TERYT GUS](https://eteryt.stat.gov.pl/), a potrawy i napoje m.in. z [Listy Produktów Tradycyjnych MRiRW](https://www.gov.pl/web/rolnictwo/lista-produktow-tradycyjnych12), a uczelnie z [rejestru POL-on](https://radon.nauka.gov.pl/pomoc/knowledge-base/414/).
-- `migrations/` – `0001_init.sql` (schemat D1), `0002_modes_meters.sql` (tryby, metry, tabela `misses`), `0003_popularity_index.sql` (indeks pod rzadkość dynamiczną)
+- `migrations/` – schemat D1, metry, tryby oraz podejścia do rankingu. Migracja `0004_daily_attempts.sql` przypisuje dotychczasowym rozgrywkom pierwsze podejście.
 - `public/` – front: `scene.js` (pikselartowe morze na canvasie), `app.js` (logika), `style.css`, `index.html`. Czcionka Pixelify Sans ładuje się z Google Fonts, bez sieci wchodzi monospace
 - `test/` – testy (`d1shim.js` emuluje D1 na `node:sqlite`)
 
 ## Rzadkość dynamiczna
+
+W kategoriach z ponad 100 różnymi wpisami głębokość stopniowo spada, maksymalnie o 40% przed korektą za popularność. Warianty pisowni i aliasy w ramach jednego wpisu liczą się jako jedna odpowiedź.
 
 Głębokość odpowiedzi to wartość z bazy skorygowana o to, jak często gracze podają daną odpowiedź w kategorii
 (`adjustMeters` w `src/game.js`): najczęstsza jest do 50% płytsza, odpowiedź, której nikt nie podaje, do 25% głębsza,

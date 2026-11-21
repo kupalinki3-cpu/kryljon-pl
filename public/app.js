@@ -173,6 +173,7 @@ let state = null; // ostatni stan biegu z serwera
 let today = null; // odpowiedź /api/today
 let tickTimer = 0;
 let submitting = false;
+let restarting = false;
 
 function stopTimer() {
   clearInterval(tickTimer);
@@ -208,10 +209,13 @@ const dayBefore = (day) => new Date(Date.parse(`${day}T00:00:00Z`) - 86400000).t
 
 /** Zapisuje ukończony bieg raz i zwraca { record, streak }. */
 function recordRun(finalState, runMode) {
-  const key = `${runMode}:${finalState.day}:${finalState.history.length}:${finalState.depth}`;
+  const oldKey = `${runMode}:${finalState.day}:${finalState.history.length}:${finalState.depth}`;
+  const key = finalState.runId == null ? oldKey : `run:${finalState.runId}`;
   const st = readStats();
-  if (store.get('recorded') === key) return { record: false, streak: st.streak };
+  const recorded = store.get('recorded');
+  if (recorded === key) return { record: false, streak: st.streak };
   store.set('recorded', key);
+  if (recorded === oldKey) return { record: false, streak: st.streak };
   st.runs += 1;
   let record = false;
   if (runMode === 'daily') {
@@ -246,15 +250,15 @@ function enterRun(newState, newMode) {
   store.set('last', newMode);
   setDepth(state.depth, false);
   renderHud(state.idx);
-  $('play-sub').textContent = newMode === 'daily' ? '▼ im rzadsza odpowiedź, tym głębiej ▼' : '▼ gra swobodna · bez rankingu ▼';
+  $('play-sub').textContent = newMode === 'daily'
+    ? `Podejście ${state.attempt} z ${state.attemptLimit} · im rzadsza odpowiedź, tym głębiej`
+    : '▼ gra swobodna · bez rankingu ▼';
 }
 
-async function startDaily(name) {
-  if (dailyDone && store.get('day') === today.day) {
-    enterRun(dailyDone, 'daily');
-    return route();
-  }
-  enterRun(await api('POST', '/api/run', { mode: 'daily', name }), 'daily');
+async function startDaily(name, fresh = false) {
+  const body = { mode: 'daily', name };
+  if (fresh) Object.assign(body, { fresh: true, afterRunId: dailyDone?.runId });
+  enterRun(await api('POST', '/api/run', body), 'daily');
   store.set('name', name);
   store.set('day', state.day);
   await route();
@@ -263,16 +267,19 @@ async function startDaily(name) {
 async function startFree(name) {
   const body = { mode: 'free', fresh: true };
   if (name) body.name = name;
-  enterRun(await api('POST', '/api/run', body), 'free');
+  const newState = await api('POST', '/api/run', body);
+  stopTimer();
+  enterRun(newState, 'free');
   await route();
 }
 
 function updateStartButtons() {
   const done = dailyDone && today && store.get('day') === today.day;
-  $('daily-title').textContent = done ? 'Dzisiejszy wynik' : 'Gra rankingowa';
+  const left = done ? dailyDone.attemptLimit - dailyDone.attempt : 0;
+  $('daily-title').textContent = done && !left ? 'Dzisiejszy wynik' : 'Gra rankingowa';
   $('daily-sub').textContent = done
-    ? 'Rankingowa gra na dziś ukończona. Zobacz miejsce.'
-    : 'Polskie pytania, raz dziennie';
+    ? (left > 0 ? `Podejście ${dailyDone.attempt + 1} z ${dailyDone.attemptLimit}` : 'Wykorzystano trzy podejścia na dziś')
+    : 'Polskie pytania, 3 podejścia dziennie';
 }
 
 async function route() {
@@ -281,7 +288,13 @@ async function route() {
 }
 
 async function nextPrompt() {
-  const p = await api('POST', '/api/prompt', {});
+  const runId = state.runId;
+  const p = await api('POST', '/api/prompt', { runId });
+  if (state.runId !== runId) return;
+  if (p.finished) {
+    state = p;
+    return showFinal();
+  }
   showPrompt(p);
 }
 
@@ -306,6 +319,7 @@ function showPrompt(p) {
   let lastTickSec = 0;
   $('ring').closest('.timer').classList.remove('urgent');
   const frame = () => {
+    if (restarting) return;
     const elapsed = performance.now() - t0;
     const toStart = p.startsInMs - elapsed;
     const remaining = p.remainingMs - elapsed;
@@ -355,10 +369,12 @@ function setHint(text, bad = false) {
 /** Czas minął, a ostatnia próba nie trafiła: serwer sam zapisze puste pytanie, gdy minie tolerancja. */
 async function settleAfterExpiry() {
   stopTimer();
+  const runId = state.runId;
   for (let i = 0; i < 5; i++) {
     await sleep(GRACE_MS + 400);
+    if (state.runId !== runId) return;
     try {
-      const r = await api('POST', '/api/answer', { idx: currentIdx, answer: '' });
+      const r = await api('POST', '/api/answer', { runId, idx: currentIdx, answer: '' });
       if (r.result) {
         state = r.state;
         return showReveal(r.result, true);
@@ -376,7 +392,7 @@ async function settleAfterExpiry() {
 }
 
 async function submit(auto = false) {
-  if (submitting) return;
+  if (submitting || restarting) return;
   submitting = true;
   if (auto) stopTimer();
   const input = $('answer');
@@ -384,7 +400,7 @@ async function submit(auto = false) {
   input.disabled = true;
   $('answer-btn').disabled = true;
   try {
-    const r = await api('POST', '/api/answer', { idx: currentIdx, answer });
+    const r = await api('POST', '/api/answer', { runId: state.runId, idx: currentIdx, answer });
     if (r.noEcho) {
       // Brak echa: to nie jest pudło, pytanie trwa dalej i można próbować ponownie.
       if (auto || performance.now() >= deadline) return settleAfterExpiry();
@@ -446,7 +462,7 @@ function showReveal(res, auto) {
 
 function shareText() {
   const squares = state.history.map((h) => TIER_SQUARES[h.tier] ?? '⬛').join('');
-  const rank = state.me ? ` (miejsce ${state.me.rank}/${state.me.players})` : '';
+  const rank = state.me && state.depth === state.bestDepth ? ` (miejsce ${state.me.rank}/${state.me.players})` : '';
   const label = mode === 'daily' ? state.day : 'gra swobodna';
   return `Polion ${label}\n${fmtDepth(state.depth)}${rank}\n${squares}\n${location.origin}`;
 }
@@ -460,9 +476,11 @@ function showFinal() {
   const daily = mode === 'daily';
   $('final-title').textContent = daily ? 'Dno osiągnięte' : 'Koniec nurkowania';
   $('final-rank').textContent = state.me
-    ? `Miejsce ${state.me.rank} z ${state.me.players} w dzisiejszym rankingu.`
+    ? `Miejsce ${state.me.rank} z ${state.me.players} · najlepszy wynik ${fmtDepth(state.bestDepth)}.`
     : daily ? '' : 'Gra swobodna nie wchodzi do rankingu.';
-  $('final-again').textContent = daily ? 'Zagraj swobodnie' : 'Jeszcze raz';
+  $('final-again').textContent = daily
+    ? (state.attempt < state.attemptLimit ? `Podejście ${state.attempt + 1} z ${state.attemptLimit}` : 'Zagraj swobodnie')
+    : 'Od nowa';
   $('final-reset').hidden = !daily;
   const { record, streak } = recordRun(state, mode);
   const badge = $('final-badge');
@@ -570,10 +588,13 @@ $('start-form').addEventListener('submit', (ev) => {
     $('name').focus();
     return toast('Do rankingu potrzebny jest pseudonim (2 do 16 znaków).');
   }
-  busy($('start-daily'), () => startDaily(name))();
+  busy($('start-daily'), () => startDaily(name, done && dailyDone.attempt < dailyDone.attemptLimit))();
 });
 $('start-free').addEventListener('click', busy($('start-free'), () => startFree(nameValue())));
-$('final-again').addEventListener('click', busy($('final-again'), () => startFree(store.get('name') || '')));
+$('final-again').addEventListener('click', busy($('final-again'), () => {
+  const name = store.get('name') || '';
+  return mode === 'daily' && state.attempt < state.attemptLimit ? startDaily(name, true) : startFree(name);
+}));
 $('final-menu').addEventListener('click', () => {
   stopTimer();
   setDepth(0, false);
@@ -597,11 +618,26 @@ $('reveal-next').addEventListener('click', async () => {
 });
 const boardDlg = $('board');
 const openBoard = () => {
+  $('restart-free').hidden = mode !== 'free' || ($('view-play').hidden && $('view-reveal').hidden);
   if (!boardDlg.open) boardDlg.showModal();
   loadBoard(boardTab);
 };
 $('menu-btn').addEventListener('click', openBoard);
 $('final-board').addEventListener('click', openBoard);
+$('restart-free').addEventListener('click', busy($('restart-free'), async () => {
+  if (mode !== 'free' || ($('view-play').hidden && $('view-reveal').hidden)) return;
+  if (submitting && !$('view-play').hidden) {
+    boardDlg.close();
+    return toast('Poczekaj, aż sprawdzimy odpowiedź.');
+  }
+  restarting = true;
+  try {
+    await startFree(store.get('name') || '');
+    boardDlg.close();
+  } finally {
+    restarting = false;
+  }
+}));
 $('board-close').addEventListener('click', () => boardDlg.close());
 boardDlg.addEventListener('click', (ev) => {
   if (ev.target === boardDlg) boardDlg.close();

@@ -5,6 +5,7 @@ export const INTRO_MS = 3_000; // czas na przeczytanie pytania, zanim ruszy zega
 export const GRACE_MS = 1_500; // tolerancja na opóźnienie sieci
 export const MIN_ANSWER_MS = 1_000; // dolna granica czasu odpowiedzi (remisy w rankingu)
 export const PROMPTS_PER_DAY = 7;
+export const DAILY_ATTEMPTS = 3;
 export const MAX_ANSWER_LEN = 80;
 
 // Głębokość odpowiedzi to liczba metrów zapisana przy wpisie (bez górnego limitu).
@@ -35,13 +36,18 @@ export const POP_EXEMPT_BELOW = 200; // "Każdy zna" nigdy nie robi się głębs
  * Głębokość po korekcie o popularność. count: ile razy podano tę odpowiedź, maxCount: ile razy
  * podano najczęstszą w kategorii, total: wszystkie odpowiedzi w kategorii.
  */
-export function adjustMeters(base, count, maxCount, total) {
-  if (!(base > 0) || !(maxCount > 0) || !(total > 0)) return base;
-  const p = Math.min(1, Math.max(0, count / maxCount));
-  let f = POP_RARER_MAX - (POP_RARER_MAX - POP_COMMON_MIN) * p;
-  if (base < POP_EXEMPT_BELOW) f = Math.min(1, f);
-  const w = Math.min(1, total / POP_MIN_TOTAL);
-  const out = Math.round((base * (1 + (f - 1) * w)) / 10) * 10;
+export function adjustMeters(base, count, maxCount, total, answerCount = 0) {
+  if (!(base > 0)) return base;
+  const breadth = answerCount <= 100 ? 1 : Math.max(0.6, 1 / (1 + 0.18 * Math.log2(answerCount / 100)));
+  let popularity = 1;
+  if (maxCount > 0 && total > 0) {
+    const p = Math.min(1, Math.max(0, count / maxCount));
+    let f = POP_RARER_MAX - (POP_RARER_MAX - POP_COMMON_MIN) * p;
+    if (base < POP_EXEMPT_BELOW) f = Math.min(1, f);
+    popularity += (f - 1) * Math.min(1, total / POP_MIN_TOTAL);
+  }
+  if (breadth === 1 && popularity === 1) return base;
+  const out = Math.round((base * breadth * popularity) / 10) * 10;
   return Math.max(10, out);
 }
 

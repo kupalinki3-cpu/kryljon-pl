@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { handle } from '../src/index.js';
 import { PROMPTS } from '../src/content/index.js';
-import { GRACE_MS, INTRO_MS, LIMIT_MS, MIN_ANSWER_MS, PROMPTS_PER_DAY, depthBand } from '../src/game.js';
+import { GRACE_MS, INTRO_MS, LIMIT_MS, MIN_ANSWER_MS, PROMPTS_PER_DAY, adjustMeters, depthBand } from '../src/game.js';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { makeD1 } from './d1shim.js';
@@ -72,12 +72,12 @@ test('pełny bieg dzienny: 7 pytań, metry sumują się bez limitu, miejsce w ra
   assert.equal(lb.json.rows[0].depth, state.depth);
 });
 
-test('głębokość nie ma sufitu: 7 odpowiedzi daje dokładnie sumę metrów z bazy', async () => {
+test('głębokość nie ma sufitu: 7 odpowiedzi daje sumę metrów po korekcie za wielkość kategorii', async () => {
   const env = setup();
   const picked = [];
   const state = await playRun(env, tok(1), 'Bezdenny', (p) => {
     const e = deepest(p);
-    picked.push(e[0]);
+    picked.push(adjustMeters(e[0], 0, 0, 0, p.answers.length));
     return e[1];
   });
   assert.equal(state.depth, picked.reduce((a, b) => a + b, 0));
@@ -153,7 +153,7 @@ test('odpowiedź w granicach tolerancji jest przyjęta, czas przycięty do limit
   });
   assert.equal(a.status, 200);
   assert.equal(a.json.result.ms, LIMIT_MS);
-  assert.equal(a.json.result.meters, shallowest(prompt)[0]);
+  assert.equal(a.json.result.meters, adjustMeters(shallowest(prompt)[0], 0, 0, 0, prompt.answers.length));
 });
 
 test('odpowiedź przed startem zegara ma czas dolnej granicy', async () => {
@@ -200,7 +200,7 @@ test('dwie równoległe poprawne odpowiedzi: jedna przechodzi, druga dostaje 409
   assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM answers').get().n, 1);
   const run = env.DB.raw.prepare('SELECT idx, meters FROM runs').get();
   assert.equal(run.idx, 1);
-  assert.equal(run.meters, entry[0]);
+  assert.equal(run.meters, adjustMeters(entry[0], 0, 0, 0, prompt.answers.length));
 });
 
 test('brak echa: nieznana odpowiedź nie kończy pytania, można próbować dalej', async () => {
@@ -265,17 +265,55 @@ test('kolejka do rozbudowy bazy: odpowiedzi bez echa liczone raz na gracza, dost
   assert.equal(closed.status, 401);
 });
 
-test('jeden bieg rankingowy na gracza dziennie, pseudonim się nie zmienia', async () => {
+test('wznowienie biegu rankingowego nie zużywa podejścia ani nie zmienia pseudonimu', async () => {
   const env = setup();
   await call(env, 'POST', '/api/run', { body: { token: tok(1), name: 'Pierwszy' } });
   const again = await call(env, 'POST', '/api/run', { body: { token: tok(1), name: 'Inny' } });
   assert.equal(again.status, 200);
+  assert.equal(again.json.attempt, 1);
   const n = env.DB.raw.prepare("SELECT COUNT(*) AS n, MIN(name) AS name FROM runs WHERE mode = 'daily'").get();
   assert.equal(n.n, 1);
   assert.equal(n.name, 'Pierwszy');
   const next = await call(env, 'POST', '/api/run', { body: { token: tok(1), name: 'Pierwszy' }, now: T0 + 24 * 3600_000 });
   assert.equal(next.json.day, '2026-11-21');
   assert.equal(next.json.idx, 0);
+  assert.equal(next.json.attempt, 1);
+});
+
+test('trzy podejścia dziennie, powtórzone żądanie nie zużywa podejścia, w rankingu jest najlepsze', async () => {
+  const env = setup();
+  const token = tok(1);
+  const best = await playRun(env, token, 'Pierwszy', (p) => deepest(p)[1]);
+  assert.equal(best.attempt, 1);
+  assert.equal(best.attemptLimit, 3);
+
+  const body = { token, fresh: true, afterRunId: best.runId, name: 'Inny' };
+  const [first, duplicate] = await Promise.all([
+    call(env, 'POST', '/api/run', { body }),
+    call(env, 'POST', '/api/run', { body }),
+  ]);
+  assert.equal(first.status, 200);
+  assert.equal(duplicate.status, 200);
+  assert.equal(first.json.runId, duplicate.json.runId);
+  assert.equal(first.json.attempt, 2);
+  assert.equal(first.json.depth, 0);
+  const stale = await call(env, 'POST', '/api/prompt', { body: { token, runId: best.runId } });
+  assert.equal(stale.status, 409);
+
+  const weaker = await playRun(env, token, 'Inny', (p) => shallowest(p)[1]);
+  assert.equal(weaker.runId, first.json.runId);
+  assert.equal(weaker.attempt, 2);
+  assert.ok(weaker.depth < best.depth);
+  assert.equal(weaker.bestDepth, best.depth);
+  const third = await playRun(env, token, 'Inny', (p) => shallowest(p)[1], {
+    extra: { fresh: true, afterRunId: weaker.runId },
+  });
+  assert.equal(third.attempt, 3);
+  const fourth = await call(env, 'POST', '/api/run', { body: { token, fresh: true, afterRunId: third.runId } });
+  assert.equal(fourth.status, 409);
+  const board = await call(env, 'GET', '/api/leaderboard', { headers: { 'x-player-token': token } });
+  assert.equal(board.json.players, 1);
+  assert.deepEqual(board.json.rows.map(({ name, depth }) => ({ name, depth })), [{ name: 'Pierwszy', depth: best.depth }]);
 });
 
 test('tryb swobodny: dowolnie wiele gier, losowe pytania, bez rankingu', async () => {
@@ -410,6 +448,13 @@ test('migracja 0002: przelicza stare punkty na metry i zachowuje biegi oraz odpo
   assert.throws(() => db.prepare("INSERT INTO runs (day, mode, player, name, created_at) VALUES ('2026-11-01', 'daily', 'p', 'Dubel', 1)").run());
   for (let i = 0; i < 3; i++) db.prepare("INSERT INTO runs (day, mode, player, name, created_at) VALUES ('free', 'free', 'p', 'Luzak', 1)").run();
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM runs WHERE mode = 'free'").get().n, 3);
+
+  db.exec(sql('0004_daily_attempts.sql'));
+  assert.equal(db.prepare('SELECT id, meters, attempt FROM daily_best_runs').get().attempt, 1);
+  assert.equal(db.prepare('SELECT meters FROM daily_best_runs').get().meters, 1230);
+  assert.equal(db.prepare('SELECT run_id FROM answers').get().run_id, 1);
+  db.prepare("INSERT INTO runs (day, mode, player, name, created_at, attempt) VALUES ('2026-11-01', 'daily', 'p', 'Stary', 2, 2)").run();
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM runs WHERE mode = 'daily'").get().n, 2);
 });
 
 test('tryb międzynarodowy został wyłączony', async () => {

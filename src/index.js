@@ -7,6 +7,7 @@ import {
   MIN_ANSWER_MS,
   depthBand,
   cleanName,
+  DAILY_ATTEMPTS,
   isValidDay,
   PROMPTS_PER_DAY,
   matchAnswer,
@@ -97,7 +98,11 @@ async function promptsOf(env, run) {
 }
 
 const getRun = (env, day, player) =>
-  env.DB.prepare("SELECT * FROM runs WHERE day = ? AND player = ? AND mode = 'daily'").bind(day, player).first();
+  env.DB.prepare("SELECT * FROM runs WHERE day = ? AND player = ? AND mode = 'daily' ORDER BY attempt DESC LIMIT 1")
+    .bind(day, player).first();
+
+const getBestRun = (env, day, player) =>
+  env.DB.prepare('SELECT * FROM daily_best_runs WHERE day = ? AND player = ?').bind(day, player).first();
 
 const getCasualRun = (env, player, mode) =>
   env.DB.prepare('SELECT * FROM runs WHERE player = ? AND mode = ? ORDER BY id DESC LIMIT 1').bind(player, mode).first();
@@ -125,13 +130,13 @@ async function history(env, runId) {
 
 async function rankOf(env, run) {
   const row = await env.DB.prepare(
-    `SELECT COUNT(*) + 1 AS rank FROM runs
-     WHERE day = ? AND mode = 'daily' AND finished = 1
+    `SELECT COUNT(*) + 1 AS rank FROM daily_best_runs
+     WHERE day = ?
        AND (meters > ? OR (meters = ? AND total_ms < ?) OR (meters = ? AND total_ms = ? AND id < ?))`,
   )
     .bind(run.day, run.meters, run.meters, run.total_ms, run.meters, run.total_ms, run.id)
     .first();
-  const players = await env.DB.prepare("SELECT COUNT(*) AS n FROM runs WHERE day = ? AND mode = 'daily' AND finished = 1")
+  const players = await env.DB.prepare('SELECT COUNT(*) AS n FROM daily_best_runs WHERE day = ?')
     .bind(run.day)
     .first();
   return { rank: row.rank, players: players.n };
@@ -210,6 +215,7 @@ async function settleExpired(env, runIn, prompts, now) {
 
 async function runState(env, run, prompts) {
   const state = {
+    runId: run.id,
     mode: run.mode,
     day: run.day,
     total: prompts.length,
@@ -219,7 +225,15 @@ async function runState(env, run, prompts) {
     finished: !!run.finished,
     history: await history(env, run.id),
   };
-  if (run.finished && run.mode === 'daily') state.me = await rankOf(env, run);
+  if (run.mode === 'daily') {
+    state.attempt = run.attempt;
+    state.attemptLimit = DAILY_ATTEMPTS;
+    if (run.finished) {
+      const best = await getBestRun(env, run.day, run.player);
+      state.me = await rankOf(env, best);
+      state.bestDepth = best.meters;
+    }
+  }
   return state;
 }
 
@@ -280,6 +294,14 @@ async function handleRun(request, env, now) {
     run = await getRun(env, day, player);
   }
   run = await settleExpired(env, run, prompts, now);
+  if (body.fresh && run.finished && (body.afterRunId == null || body.afterRunId === run.id)) {
+    if (run.attempt >= DAILY_ATTEMPTS) {
+      throw new HttpError(409, 'Wykorzystano trzy podejścia rankingowe na dziś');
+    }
+    await env.DB.prepare("INSERT OR IGNORE INTO runs (day, mode, player, name, created_at, attempt) VALUES (?, 'daily', ?, ?, ?, ?)")
+      .bind(day, player, run.name, now, run.attempt + 1).run();
+    run = await getRun(env, day, player);
+  }
   return json(await runState(env, run, prompts));
 }
 
@@ -288,6 +310,9 @@ async function loadRun(body, env, now) {
   const mode = modeOf(body);
   const run = mode === 'daily' ? await getRun(env, warsawDay(now), player) : await getCasualRun(env, player, mode);
   if (!run) throw new HttpError(404, 'Najpierw rozpocznij nurkowanie');
+  if (body.runId != null && body.runId !== run.id) {
+    throw new HttpError(409, 'Ta rozgrywka jest już nieaktualna. Odśwież stronę.');
+  }
   const prompts = await promptsOf(env, run);
   return { run: await settleExpired(env, run, prompts, now), prompts };
 }
@@ -339,7 +364,7 @@ async function handleAnswer(request, env, now) {
   }
 
   const pop = await popularity(env, prompt.id, now);
-  const meters = adjustMeters(match.meters, pop.counts.get(match.shown) ?? 0, pop.max, pop.total);
+  const meters = adjustMeters(match.meters, pop.counts.get(match.shown) ?? 0, pop.max, pop.total, prompt.answers.length);
   const ms = Math.min(LIMIT_MS, Math.max(MIN_ANSWER_MS, now - run.started_at));
   const share = await crowdShare(env, run.day, prompt.id, match.shown);
   try {
@@ -370,12 +395,12 @@ async function handleLeaderboard(request, env, now) {
   const day = url.searchParams.get('day') || today;
   if (!isValidDay(day) || day > today) throw new HttpError(400, 'Niepoprawna data');
   const { results } = await env.DB.prepare(
-    `SELECT id, name, meters, total_ms FROM runs WHERE day = ? AND mode = 'daily' AND finished = 1
+    `SELECT id, name, meters, total_ms FROM daily_best_runs WHERE day = ?
      ORDER BY meters DESC, total_ms ASC, id ASC LIMIT 50`,
   )
     .bind(day)
     .all();
-  const players = await env.DB.prepare("SELECT COUNT(*) AS n FROM runs WHERE day = ? AND mode = 'daily' AND finished = 1")
+  const players = await env.DB.prepare('SELECT COUNT(*) AS n FROM daily_best_runs WHERE day = ?')
     .bind(day)
     .first();
   const out = {
@@ -391,8 +416,8 @@ async function handleLeaderboard(request, env, now) {
   };
   const token = request.headers.get('x-player-token');
   if (token && TOKEN_RE.test(token)) {
-    const run = await getRun(env, day, await sha256Hex(`glebia:${token}`));
-    if (run && run.finished) out.me = await rankOf(env, run);
+    const run = await getBestRun(env, day, await sha256Hex(`glebia:${token}`));
+    if (run) out.me = await rankOf(env, run);
   }
   return json(out);
 }

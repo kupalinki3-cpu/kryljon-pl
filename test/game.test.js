@@ -5,6 +5,7 @@ import {
   BANDS,
   PROMPTS_PER_DAY,
   boundedLevenshtein,
+  adjustMeters,
   depthBand,
   pointsOf,
   cleanName,
@@ -18,6 +19,34 @@ import {
 } from '../src/game.js';
 
 const byId = (id) => PROMPTS.find((p) => p.id === id);
+
+test('większe kategorie obniżają głębokość niezależnie od popularności odpowiedzi', () => {
+  assert.equal(adjustMeters(1000, 0, 0, 0, 100), 1000);
+  assert.equal(adjustMeters(1000, 0, 0, 0, 200), 850);
+  assert.ok(adjustMeters(1000, 0, 0, 0, 1000) < 850);
+  assert.equal(adjustMeters(1000, 0, 0, 0, 5000), 600);
+});
+
+test('audyt popularnych odpowiedzi zalicza typowe nazwy oraz skróty', () => {
+  const cases = [
+    ['slodycze', 'chrupki Flips', 'Flips'],
+    ['imie', 'Ania', 'Anna'],
+    ['rzeka', 'Drawa', 'Drawa'],
+    ['program', '1 z 10', 'Jeden z dziesięciu'],
+    ['serwis', 'IKP', 'Internetowe Konto Pacjenta'],
+    ['naukowiec', 'Tadeusz Reichstein', 'Tadeusz Reichstein'],
+    ['jezioro', 'jezioro lubie', 'Lubie'],
+    ['mem', 'gdzie jest bialy wegorz', 'Polish cow'],
+    ['polskie_planszowki', 'Kolejka IPN', 'Kolejka'],
+    ['gra', 'CP 2077', 'Cyberpunk 2077'],
+  ];
+  for (const [id, answer, expected] of cases) {
+    assert.equal(matchAnswer(byId(id), answer)?.shown, expected, `${id}: ${answer}`);
+  }
+  for (const [id, wrong] of [['sklep', 'Lidl'], ['bajka', 'Smerfy'], ['polskie_planszowki', 'Dixit']]) {
+    assert.equal(matchAnswer(byId(id), wrong), null, `${id}: ${wrong}`);
+  }
+});
 
 test('normalize usuwa diakrytyki, ł i znaki specjalne', () => {
   assert.equal(normalize('  Żółć, GĘŚLĄ!  '), 'zolc gesla');
