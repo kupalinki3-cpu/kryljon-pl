@@ -125,8 +125,12 @@ export function matchAnswer(prompt, raw) {
     let bestEntry = -1;
     let ambiguous = false;
     const digits = norm.replace(/\D+/g, '');
+    // Przy najwyżej 1–2 zmianach co najmniej jeden z 2–3 kawałków zostaje nienaruszony.
+    const size = Math.floor(norm.length / (allowed + 1));
+    const blocks = Array.from({ length: allowed + 1 }, (_, i) => norm.slice(i * size, (i + 1) * size));
     for (const k of keys) {
-      if (k.length < 7) continue;
+      if (k.length < 7 || Math.abs(k.length - norm.length) > allowed) continue;
+      if (!blocks.some((block) => k.includes(block))) continue;
       // Cyfry muszą się zgadzać dokładnie ("Dying Light 3" to nie "Dying Light 2").
       if (k.replace(/\D+/g, '') !== digits) continue;
       const d = boundedLevenshtein(norm, k, allowed);

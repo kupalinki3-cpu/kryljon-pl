@@ -36,7 +36,7 @@ export default [
   ),
   cat(
     'nazwisko',
-    'Polskie nazwisko',
+    'Nazwisko występujące w Polsce',
     group(60, 'Nowak', 'Kowalski', 'Wiśniewski', 'Wójcik', 'Kowalczyk', 'Kamiński', 'Lewandowski', 'Zieliński',
       'Szymański', 'Woźniak', 'Dąbrowski', 'Kozłowski', 'Jankowski', 'Mazur', 'Wojciechowski'),
     group(160, 'Kwiatkowski', 'Krawczyk', 'Kaczmarek', 'Piotrowski', 'Grabowski', 'Zając', 'Pawłowski', 'Michalski',

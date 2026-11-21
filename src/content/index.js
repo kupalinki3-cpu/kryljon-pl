@@ -28,6 +28,7 @@ import { terytCategories, terytExtras } from './teryt.js';
 import produktyTradycyjne from './produkty-tradycyjne.js';
 import uzupPopularne from './uzup-popularne.js';
 import uzupSprawdzone from './uzup-sprawdzone.js';
+import nazwiskaPesel from './nazwiska-pesel.js';
 import { wikiCategories, wikiExtras } from './uzup-wikipedia.js';
 import { normalize } from '../game.js';
 
@@ -37,6 +38,7 @@ for (const part of [
   uzupelnieniaPodstawowe, uzupPrzyroda, uzupKultura, uzupLudzie, uzupReszta, uzupNet,
   uzupMasa, uzupMasa2, uzupMasa3, uzupMasa4, uzupMasa5, uzupPopularne, uzupWirale,
   terytExtras, produktyTradycyjne, wikiExtras, uzupKraj, uzupKulturaPolska, uzupLudziePolska, uzupPolon, uzupSprawdzone,
+  { nazwisko: nazwiskaPesel },
 ]) {
   for (const [id, list] of Object.entries(part)) uzupelnienia[id] = [...(uzupelnienia[id] ?? []), ...list];
 }

@@ -20,6 +20,14 @@ import {
 
 const byId = (id) => PROMPTS.find((p) => p.id === id);
 
+test('nazwiska z PESEL zaliczają obie podobne pisownie i rzadkie nazwiska', () => {
+  const prompt = byId('nazwisko');
+  for (const name of ['Mystkowski', 'Mystkowska', 'Myszkowski', 'Myszkowska', 'Fiut', 'Kutasko']) {
+    assert.equal(matchAnswer(prompt, name.toUpperCase())?.shown, name);
+  }
+  assert.equal(matchAnswer(prompt, 'ugabugabalabubasjdksks'), null);
+});
+
 test('większe kategorie obniżają głębokość niezależnie od popularności odpowiedzi', () => {
   assert.equal(adjustMeters(1000, 0, 0, 0, 100), 1000);
   assert.equal(adjustMeters(1000, 0, 0, 0, 200), 850);

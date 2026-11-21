@@ -46,7 +46,7 @@ Baza jest punktem startowym i rośnie razem z graczami: nie zna wszystkiego, co 
 
 - `src/game.js` – czysta logika (normalizacja, dopasowanie, daty, losowanie)
 - `src/index.js` – API Workera
-- `src/content/` – 54 kategorie związane z Polską, ponad 11 600 odpowiedzi i ich aliasy. Dane geograficzne pochodzą m.in. z [rejestru TERYT GUS](https://eteryt.stat.gov.pl/), a potrawy i napoje m.in. z [Listy Produktów Tradycyjnych MRiRW](https://www.gov.pl/web/rolnictwo/lista-produktow-tradycyjnych12), a uczelnie z [rejestru POL-on](https://radon.nauka.gov.pl/pomoc/knowledge-base/414/).
+- `src/content/` – 54 kategorie związane z Polską. Dane geograficzne pochodzą m.in. z [rejestru TERYT GUS](https://eteryt.stat.gov.pl/), potrawy i napoje z [Listy Produktów Tradycyjnych MRiRW](https://www.gov.pl/web/rolnictwo/lista-produktow-tradycyjnych12), uczelnie z [rejestru POL-on](https://radon.nauka.gov.pl/pomoc/knowledge-base/414/), a nazwiska z [publicznych zestawień PESEL](https://dane.gov.pl/pl/dataset/1681) (20.01.2026, od 200 wystąpień łącznie oraz osobno potwierdzone rzadsze wpisy).
 - `migrations/` – schemat D1, metry, tryby oraz podejścia do rankingu. Migracja `0004_daily_attempts.sql` przypisuje dotychczasowym rozgrywkom pierwsze podejście.
 - `public/` – front: `scene.js` (pikselartowe morze na canvasie), `app.js` (logika), `style.css`, `index.html`. Czcionka Pixelify Sans ładuje się z Google Fonts, bez sieci wchodzi monospace
 - `test/` – testy (`d1shim.js` emuluje D1 na `node:sqlite`)

@@ -1,5 +1,6 @@
 import { PROMPTS } from './content/index.js';
 import {
+  buildIndex,
   GRACE_MS,
   INTRO_MS,
   LIMIT_MS,
@@ -21,6 +22,7 @@ import {
 } from './game.js';
 
 const PROMPT_BY_ID = new Map(PROMPTS.map((p) => [p.id, p]));
+buildIndex(PROMPT_BY_ID.get('nazwisko')); // duży wykaz PESEL indeksujemy przy starcie Workera
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,64}$/;
 const MAX_BODY = 2048;
 
