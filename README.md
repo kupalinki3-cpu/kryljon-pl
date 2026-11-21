@@ -6,7 +6,7 @@ Polska gra w stylu Krillion: 7 pytań, 25 sekund na odpowiedź. Każda odpowied�
 
 Tryby gry:
 
-- **rankingowy**: do trzech podejść dziennie, te same pytania dla wszystkich. W rankingu Dziś / Wczoraj widnieje najlepszy ukończony wynik gracza.
+- **rankingowy**: dowolna liczba podejść, te same pytania dla wszystkich w danym dniu. W rankingu wszech czasów widnieje najwyższy ukończony wynik każdego gracza.
 - **swobodny**: losowe pytania z polskiej bazy, bez rankingu. W trakcie nurkowania otwórz menu i wybierz „Od nowa”, aby wylosować nowy zestaw.
 
 Odpowiedź, której nie ma w bazie, nie kończy pytania („brak echa”): można próbować dalej, dopóki płynie czas. W kategorii polskich memów wpisz nazwę mema, tytuł filmiku albo jego rozpoznawalny cytat. Gra sprawdza listę odpowiedzi i aliasów, np. „Ale urwał” i „ale urwal ale to bylo dobre” prowadzą do tego samego wpisu.

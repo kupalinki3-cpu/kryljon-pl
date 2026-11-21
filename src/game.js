@@ -5,7 +5,6 @@ export const INTRO_MS = 3_000; // czas na przeczytanie pytania, zanim ruszy zega
 export const GRACE_MS = 1_500; // tolerancja na opóźnienie sieci
 export const MIN_ANSWER_MS = 1_000; // dolna granica czasu odpowiedzi (remisy w rankingu)
 export const PROMPTS_PER_DAY = 7;
-export const DAILY_ATTEMPTS = 3;
 export const MAX_ANSWER_LEN = 80;
 
 // Głębokość odpowiedzi to liczba metrów zapisana przy wpisie (bez górnego limitu).

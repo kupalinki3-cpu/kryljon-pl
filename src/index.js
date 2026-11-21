@@ -9,8 +9,6 @@ import {
   MIN_ANSWER_MS,
   depthBand,
   cleanName,
-  DAILY_ATTEMPTS,
-  isValidDay,
   PROMPTS_PER_DAY,
   matchAnswer,
   adjustMeters,
@@ -109,8 +107,11 @@ const getRun = (env, day, player) =>
   env.DB.prepare("SELECT * FROM runs WHERE day = ? AND player = ? AND mode = 'daily' ORDER BY attempt DESC LIMIT 1")
     .bind(day, player).first();
 
-const getBestRun = (env, day, player) =>
-  env.DB.prepare('SELECT * FROM daily_best_runs WHERE day = ? AND player = ?').bind(day, player).first();
+const getBestRun = (env, player) =>
+  env.DB.prepare(
+    `SELECT * FROM runs WHERE player = ? AND mode = 'daily' AND finished = 1
+     ORDER BY meters DESC, total_ms ASC, id ASC LIMIT 1`,
+  ).bind(player).first();
 
 const getCasualRun = (env, player, mode) =>
   env.DB.prepare('SELECT * FROM runs WHERE player = ? AND mode = ? ORDER BY id DESC LIMIT 1').bind(player, mode).first();
@@ -138,15 +139,12 @@ async function history(env, runId) {
 
 async function rankOf(env, run) {
   const row = await env.DB.prepare(
-    `SELECT COUNT(*) + 1 AS rank FROM daily_best_runs
-     WHERE day = ?
-       AND (meters > ? OR (meters = ? AND total_ms < ?) OR (meters = ? AND total_ms = ? AND id < ?))`,
+    `SELECT COUNT(*) + 1 AS rank FROM all_time_best_runs
+     WHERE meters > ? OR (meters = ? AND total_ms < ?) OR (meters = ? AND total_ms = ? AND id < ?)`,
   )
-    .bind(run.day, run.meters, run.meters, run.total_ms, run.meters, run.total_ms, run.id)
+    .bind(run.meters, run.meters, run.total_ms, run.meters, run.total_ms, run.id)
     .first();
-  const players = await env.DB.prepare('SELECT COUNT(*) AS n FROM daily_best_runs WHERE day = ?')
-    .bind(run.day)
-    .first();
+  const players = await env.DB.prepare('SELECT COUNT(*) AS n FROM all_time_best_runs').first();
   return { rank: row.rank, players: players.n };
 }
 
@@ -235,11 +233,11 @@ async function runState(env, run, prompts) {
   };
   if (run.mode === 'daily') {
     state.attempt = run.attempt;
-    state.attemptLimit = DAILY_ATTEMPTS;
     if (run.finished) {
-      const best = await getBestRun(env, run.day, run.player);
+      const best = await getBestRun(env, run.player);
       state.me = await rankOf(env, best);
       state.bestDepth = best.meters;
+      state.isBest = best.id === run.id;
     }
   }
   return state;
@@ -304,9 +302,6 @@ async function handleRun(request, env, now) {
   }
   run = await settleExpired(env, run, prompts, now);
   if (body.fresh && run.finished && (body.afterRunId == null || body.afterRunId === run.id)) {
-    if (run.attempt >= DAILY_ATTEMPTS) {
-      throw new HttpError(409, 'Wykorzystano trzy podejścia rankingowe na dziś');
-    }
     await env.DB.prepare("INSERT OR IGNORE INTO runs (day, mode, player, name, created_at, attempt) VALUES (?, 'daily', ?, ?, ?, ?)")
       .bind(day, player, run.name, now, run.attempt + 1).run();
     run = await getRun(env, day, player);
@@ -419,22 +414,14 @@ async function handleAnswer(request, env, now, ctx) {
   return json({ result, state: await runState(env, after, prompts) });
 }
 
-async function handleLeaderboard(request, env, now) {
-  const url = new URL(request.url);
-  const today = warsawDay(now);
-  const day = url.searchParams.get('day') || today;
-  if (!isValidDay(day) || day > today) throw new HttpError(400, 'Niepoprawna data');
+async function handleLeaderboard(request, env) {
   const { results } = await env.DB.prepare(
-    `SELECT id, name, meters, total_ms FROM daily_best_runs WHERE day = ?
+    `SELECT name, meters, total_ms FROM all_time_best_runs
      ORDER BY meters DESC, total_ms ASC, id ASC LIMIT 50`,
   )
-    .bind(day)
     .all();
-  const players = await env.DB.prepare('SELECT COUNT(*) AS n FROM daily_best_runs WHERE day = ?')
-    .bind(day)
-    .first();
+  const players = await env.DB.prepare('SELECT COUNT(*) AS n FROM all_time_best_runs').first();
   const out = {
-    day,
     players: players.n,
     rows: results.map((r, i) => ({
       rank: i + 1,
@@ -446,7 +433,7 @@ async function handleLeaderboard(request, env, now) {
   };
   const token = request.headers.get('x-player-token');
   if (token && TOKEN_RE.test(token)) {
-    const run = await getBestRun(env, day, await sha256Hex(`glebia:${token}`));
+    const run = await getBestRun(env, await sha256Hex(`glebia:${token}`));
     if (run) out.me = await rankOf(env, run);
   }
   return json(out);
@@ -522,7 +509,7 @@ export async function handle(request, env, now = Date.now(), ctx) {
       return env.ASSETS ? env.ASSETS.fetch(request) : fail(404, 'Nie znaleziono');
     }
     if (request.method === 'GET' && pathname === '/api/today') return await handleToday(env, now);
-    if (request.method === 'GET' && pathname === '/api/leaderboard') return await handleLeaderboard(request, env, now);
+    if (request.method === 'GET' && pathname === '/api/leaderboard') return await handleLeaderboard(request, env);
     if (request.method === 'GET' && pathname === '/api/admin/unmatched') return await handleUnmatched(request, env);
     if (request.method === 'POST' && pathname === '/api/admin/review') return await handleReview(request, env, now);
     if (request.method === 'POST' && pathname === '/api/run') return await handleRun(request, env, now);

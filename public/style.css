@@ -235,9 +235,6 @@ dialog::backdrop { background: rgba(2, 6, 15, 0.7); }
 .board-head h2 { margin: 0; font-size: 1.5rem; color: var(--cyan); }
 #restart-free { margin-top: 14px; }
 #restart-free[hidden] { display: none; }
-.tabs { display: flex; gap: 8px; margin: 14px 0 6px; }
-.tabs button { font: inherit; padding: 6px 16px; color: var(--muted); background: #0d2037; border: 0; cursor: pointer; box-shadow: 0 -3px 0 0 #0d2037, 0 3px 0 0 #0d2037, -3px 0 0 0 #0d2037, 3px 3px 0 0 #0d2037; margin: 3px; }
-.tabs button[aria-selected='true'] { color: #03222b; background: var(--cyan); box-shadow: 0 -3px 0 0 var(--cyan), 0 3px 0 0 var(--cyan), -3px 0 0 0 var(--cyan), 3px 0 0 0 var(--cyan); font-weight: 700; }
 .board-list { list-style: none; margin: 10px 0 0; padding: 0; }
 .board-list li { display: grid; grid-template-columns: 2.6rem 1fr auto auto; gap: 10px; padding: 8px 6px; align-items: center; border-bottom: 2px dashed rgba(98, 230, 255, 0.14); }
 .board-list li.me { background: rgba(255, 92, 122, 0.18); }

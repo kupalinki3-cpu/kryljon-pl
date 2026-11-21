@@ -252,7 +252,7 @@ function enterRun(newState, newMode) {
   setDepth(state.depth, false);
   renderHud(state.idx);
   $('play-sub').textContent = newMode === 'daily'
-    ? `Podejście ${state.attempt} z ${state.attemptLimit} · im rzadsza odpowiedź, tym głębiej`
+    ? `Podejście ${state.attempt} · im rzadsza odpowiedź, tym głębiej`
     : '▼ gra swobodna · bez rankingu ▼';
 }
 
@@ -272,15 +272,6 @@ async function startFree(name) {
   stopTimer();
   enterRun(newState, 'free');
   await route();
-}
-
-function updateStartButtons() {
-  const done = dailyDone && today && store.get('day') === today.day;
-  const left = done ? dailyDone.attemptLimit - dailyDone.attempt : 0;
-  $('daily-title').textContent = done && !left ? 'Dzisiejszy wynik' : 'Gra rankingowa';
-  $('daily-sub').textContent = done
-    ? (left > 0 ? `Podejście ${dailyDone.attempt + 1} z ${dailyDone.attemptLimit}` : 'Wykorzystano trzy podejścia na dziś')
-    : 'Polskie pytania, 3 podejścia dziennie';
 }
 
 async function route() {
@@ -475,7 +466,7 @@ function showReveal(res, auto) {
 
 function shareText() {
   const squares = state.history.map((h) => TIER_SQUARES[h.tier] ?? '⬛').join('');
-  const rank = state.me && state.depth === state.bestDepth ? ` (miejsce ${state.me.rank}/${state.me.players})` : '';
+  const rank = state.me && state.isBest ? ` (miejsce ${state.me.rank}/${state.me.players} w rankingu wszech czasów)` : '';
   const label = mode === 'daily' ? state.day : 'gra swobodna';
   return `Polion ${label}\n${fmtDepth(state.depth)}${rank}\n${squares}\n${location.origin}`;
 }
@@ -489,11 +480,8 @@ function showFinal() {
   const daily = mode === 'daily';
   $('final-title').textContent = daily ? 'Dno osiągnięte' : 'Koniec nurkowania';
   $('final-rank').textContent = state.me
-    ? `Miejsce ${state.me.rank} z ${state.me.players} · najlepszy wynik ${fmtDepth(state.bestDepth)}.`
+    ? `Rekord wszech czasów: ${fmtDepth(state.bestDepth)} · miejsce ${state.me.rank} z ${state.me.players}.`
     : daily ? '' : 'Gra swobodna nie wchodzi do rankingu.';
-  $('final-again').textContent = daily
-    ? (state.attempt < state.attemptLimit ? `Podejście ${state.attempt + 1} z ${state.attemptLimit}` : 'Zagraj swobodnie')
-    : 'Od nowa';
   $('final-reset').hidden = !daily;
   const { record, streak } = recordRun(state, mode);
   const badge = $('final-badge');
@@ -531,29 +519,18 @@ function showFinal() {
     li.append(bar);
     list.append(li);
   }
-  if (daily) {
-    dailyDone = state;
-    updateStartButtons();
-    loadBoard('today');
-  }
+  if (daily) dailyDone = state;
 }
 
 // ---------- ranking ----------
-let boardTab = 'today';
-async function loadBoard(which) {
-  boardTab = which;
-  $('tab-today').setAttribute('aria-selected', String(which === 'today'));
-  $('tab-yesterday').setAttribute('aria-selected', String(which === 'yesterday'));
+async function loadBoard() {
   const list = $('board-list');
   const meta = $('board-meta');
   try {
-    if (!today) await loadToday();
-    const day = which === 'today' ? today.day : today.yesterday;
-    const lb = await api('GET', `/api/leaderboard?day=${day}`);
-    if (boardTab !== which) return; // użytkownik zdążył przełączyć kartę
+    const lb = await api('GET', '/api/leaderboard');
     meta.textContent = lb.players
-      ? `${lb.day}: ${lb.players} ${lb.players === 1 ? 'gracz' : 'graczy'} ukończyło nurkowanie.`
-      : `${lb.day}: nikt jeszcze nie ukończył nurkowania.`;
+      ? `Liczba graczy w rankingu: ${lb.players}`
+      : 'Nikt jeszcze nie ukończył nurkowania rankingowego.';
     list.replaceChildren();
     const myName = store.get('name');
     for (const r of lb.rows) {
@@ -605,12 +582,12 @@ $('start-form').addEventListener('submit', (ev) => {
     $('name').focus();
     return toast('Do rankingu potrzebny jest pseudonim (2 do 16 znaków).');
   }
-  busy($('start-daily'), () => startDaily(name, done && dailyDone.attempt < dailyDone.attemptLimit))();
+  busy($('start-daily'), () => startDaily(name, !!done))();
 });
 $('start-free').addEventListener('click', busy($('start-free'), () => startFree(nameValue())));
 $('final-again').addEventListener('click', busy($('final-again'), () => {
   const name = store.get('name') || '';
-  return mode === 'daily' && state.attempt < state.attemptLimit ? startDaily(name, true) : startFree(name);
+  return mode === 'daily' ? startDaily(name, true) : startFree(name);
 }));
 $('final-menu').addEventListener('click', () => {
   stopTimer();
@@ -618,7 +595,6 @@ $('final-menu').addEventListener('click', () => {
   $('hud-steps').replaceChildren();
   $('hud-score').textContent = '0';
   $('hud-prompt').textContent = 'Wybierz tryb gry';
-  updateStartButtons();
   renderStartStats();
   show('start');
 });
@@ -637,7 +613,7 @@ const boardDlg = $('board');
 const openBoard = () => {
   $('restart-free').hidden = mode !== 'free' || ($('view-play').hidden && $('view-reveal').hidden);
   if (!boardDlg.open) boardDlg.showModal();
-  loadBoard(boardTab);
+  loadBoard();
 };
 $('menu-btn').addEventListener('click', openBoard);
 $('final-board').addEventListener('click', openBoard);
@@ -672,8 +648,6 @@ $('final-share').addEventListener('click', async () => {
     toast('Nie udało się skopiować. Zaznacz wynik ręcznie.');
   }
 });
-$('tab-today').addEventListener('click', () => loadBoard('today'));
-$('tab-yesterday').addEventListener('click', () => loadBoard('yesterday'));
 
 // ---------- start ----------
 async function tryResumeFree() {
@@ -711,9 +685,7 @@ async function tryResumeDaily(savedName) {
     let resumed = false;
     if (last === 'free') resumed = await tryResumeFree();
     if (!resumed && savedName && store.get('day') === today.day) resumed = await tryResumeDaily(savedName);
-    updateStartButtons();
   } catch (e) {
     toast(e.message);
   }
-  loadBoard('today');
 })();

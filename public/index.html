@@ -50,8 +50,8 @@
           <input id="name" name="name" type="text" maxlength="16" minlength="2" placeholder="np. Rekin z Gdyni">
           <div class="modes">
             <button type="submit" class="btn mode" id="start-daily">
-              <b id="daily-title">Gra rankingowa</b>
-              <small id="daily-sub">Polskie pytania, 3 podejścia dziennie</small>
+              <b>Gra rankingowa</b>
+              <small>Polskie pytania, podejścia bez limitu</small>
             </button>
             <button type="button" class="btn cyan mode" id="start-free">
               <b>Gra swobodna</b>
@@ -125,7 +125,7 @@
           <button type="button" class="btn ghost" id="final-board">Ranking</button>
         </div>
         <div class="row">
-          <button type="button" class="btn cyan" id="final-again">Jeszcze raz swobodnie</button>
+          <button type="button" class="btn cyan" id="final-again">Od nowa</button>
           <button type="button" class="btn ghost" id="final-menu">Menu</button>
         </div>
         <p class="note" id="final-reset"></p>
@@ -136,15 +136,11 @@
 
   <dialog id="board" class="px">
     <div class="board-head">
-      <h2>Ranking dnia</h2>
+      <h2>Ranking wszech czasów</h2>
       <i class="screen-art podium" aria-hidden="true"></i>
       <button type="button" class="btn ghost icon" id="board-close" aria-label="Zamknij ranking">✕</button>
     </div>
     <button type="button" id="restart-free" class="btn cyan" hidden>Od nowa</button>
-    <div class="tabs" role="tablist">
-      <button type="button" role="tab" id="tab-today" aria-selected="true">Dziś</button>
-      <button type="button" role="tab" id="tab-yesterday" aria-selected="false">Wczoraj</button>
-    </div>
     <p class="note" id="board-meta"></p>
     <ol id="board-list" class="board-list"></ol>
   </dialog>

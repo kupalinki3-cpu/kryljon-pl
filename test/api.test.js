@@ -66,7 +66,7 @@ test('pełny bieg dzienny: 7 pytań, metry sumują się bez limitu, miejsce w ra
   assert.ok(state.history.every((h) => h.meters >= 1000 || h.tier >= 2), 'najgłębsze odpowiedzi są głębokie');
   assert.deepEqual(state.me, { rank: 1, players: 1 });
   const lb = await call(env, 'GET', '/api/leaderboard');
-  assert.equal(lb.json.day, DAY);
+  assert.equal(lb.json.day, undefined);
   assert.equal(lb.json.rows.length, 1);
   assert.equal(lb.json.rows[0].name, 'Przemek');
   assert.equal(lb.json.rows[0].depth, state.depth);
@@ -378,12 +378,12 @@ test('wznowienie biegu rankingowego nie zużywa podejścia ani nie zmienia pseud
   assert.equal(next.json.attempt, 1);
 });
 
-test('trzy podejścia dziennie, powtórzone żądanie nie zużywa podejścia, w rankingu jest najlepsze', async () => {
+test('podejścia bez limitu, powtórzone żądanie nie zużywa podejścia, w rankingu jest najlepsze', async () => {
   const env = setup();
   const token = tok(1);
   const best = await playRun(env, token, 'Pierwszy', (p) => deepest(p)[1]);
   assert.equal(best.attempt, 1);
-  assert.equal(best.attemptLimit, 3);
+  assert.equal(best.attemptLimit, undefined);
 
   const body = { token, fresh: true, afterRunId: best.runId, name: 'Inny' };
   const [first, duplicate] = await Promise.all([
@@ -403,12 +403,16 @@ test('trzy podejścia dziennie, powtórzone żądanie nie zużywa podejścia, w 
   assert.equal(weaker.attempt, 2);
   assert.ok(weaker.depth < best.depth);
   assert.equal(weaker.bestDepth, best.depth);
+  assert.equal(weaker.isBest, false);
   const third = await playRun(env, token, 'Inny', (p) => shallowest(p)[1], {
     extra: { fresh: true, afterRunId: weaker.runId },
   });
   assert.equal(third.attempt, 3);
-  const fourth = await call(env, 'POST', '/api/run', { body: { token, fresh: true, afterRunId: third.runId } });
-  assert.equal(fourth.status, 409);
+  const fourth = await playRun(env, token, 'Inny', (p) => shallowest(p)[1], {
+    extra: { fresh: true, afterRunId: third.runId },
+  });
+  assert.equal(fourth.attempt, 4);
+  assert.equal(fourth.finished, true);
   const board = await call(env, 'GET', '/api/leaderboard', { headers: { 'x-player-token': token } });
   assert.equal(board.json.players, 1);
   assert.deepEqual(board.json.rows.map(({ name, depth }) => ({ name, depth })), [{ name: 'Pierwszy', depth: best.depth }]);
@@ -427,7 +431,7 @@ test('tryb swobodny: dowolnie wiele gier, losowe pytania, bez rankingu', async (
   assert.equal(second.json.idx, 0);
   assert.equal(second.json.depth, 0);
   assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM runs WHERE mode = 'free'").get().n, 2);
-  // Swobodne gry nie wchodzą do rankingu dziennego i nie blokują biegu rankingowego.
+  // Swobodne gry nie wchodzą do rankingu i nie blokują biegu rankingowego.
   const lb = await call(env, 'GET', '/api/leaderboard', { now: T0 + 60_000 });
   assert.equal(lb.json.rows.length, 0);
   const daily = await call(env, 'POST', '/api/run', { body: { token: tok(1), name: 'Luzak' }, now: T0 + 60_000 });
@@ -482,8 +486,6 @@ test('walidacja wejścia', async () => {
   assert.equal(bad.status, 400);
   const huge = await handle(new Request('https://glebia.test/api/run', { method: 'POST', body: 'x'.repeat(5000) }), env, T0);
   assert.equal(huge.status, 413);
-  assert.equal((await call(env, 'GET', '/api/leaderboard?day=2026-13-99')).status, 400);
-  assert.equal((await call(env, 'GET', '/api/leaderboard?day=2027-01-01')).status, 400);
   assert.equal((await call(env, 'GET', '/api/nie-ma')).status, 404);
 });
 
@@ -517,14 +519,21 @@ test('ranking ukrywa niedokończone biegi i nie ujawnia tokenów', async () => {
   assert.deepEqual(Object.keys(lb2.json.rows[0]).sort(), ['depth', 'ms', 'name', 'points', 'rank']);
 });
 
-test('ranking z poprzedniego dnia jest dostępny po zmianie daty', async () => {
+test('ranking obejmuje wiele dni, zachowując tylko rekord każdego gracza', async () => {
   const env = setup();
-  await playRun(env, tok(1), 'Wczorajszy', (p) => deepest(p)[1]);
+  const best = await playRun(env, tok(1), 'Wczorajszy', (p) => deepest(p)[1]);
   const next = T0 + 24 * 3600_000;
-  const today = await call(env, 'GET', '/api/leaderboard', { now: next });
-  assert.equal(today.json.rows.length, 0);
-  const yesterday = await call(env, 'GET', `/api/leaderboard?day=${DAY}`, { now: next });
-  assert.equal(yesterday.json.rows.length, 1);
+  const weaker = await playRun(env, tok(1), 'Dzisiaj', (p) => shallowest(p)[1], { start: next });
+  assert.ok(weaker.depth < best.depth);
+  assert.equal(weaker.bestDepth, best.depth);
+  await playRun(env, tok(2), 'Nowy gracz', (p) => shallowest(p)[1], { start: next });
+  const board = await call(env, 'GET', '/api/leaderboard', {
+    now: next, headers: { 'x-player-token': tok(1) },
+  });
+  assert.equal(board.json.players, 2);
+  assert.deepEqual(board.json.rows.map((row) => row.name), ['Wczorajszy', 'Nowy gracz']);
+  assert.equal(board.json.rows[0].depth, best.depth);
+  assert.deepEqual(board.json.me, { rank: 1, players: 2 });
 });
 
 test('migracja 0002: przelicza stare punkty na metry i zachowuje biegi oraz odpowiedzi', () => {
@@ -553,6 +562,18 @@ test('migracja 0002: przelicza stare punkty na metry i zachowuje biegi oraz odpo
   assert.equal(db.prepare('SELECT run_id FROM answers').get().run_id, 1);
   db.prepare("INSERT INTO runs (day, mode, player, name, created_at, attempt) VALUES ('2026-11-01', 'daily', 'p', 'Stary', 2, 2)").run();
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM runs WHERE mode = 'daily'").get().n, 2);
+
+  db.exec(sql('0006_all_time_ranking.sql'));
+  assert.deepEqual(db.prepare("SELECT attempt FROM runs WHERE mode = 'daily' ORDER BY id").all().map((r) => r.attempt), [1, 2]);
+  const record = db.prepare('SELECT id, attempt, meters FROM all_time_best_runs').get();
+  assert.equal(record.id, 1);
+  assert.equal(record.meters, 1230);
+  assert.equal(record.attempt, 1);
+  assert.equal(db.prepare('SELECT meters FROM answers WHERE run_id = 1').get().meters, 450);
+  assert.equal(db.prepare('SELECT meters FROM daily_best_runs').get().meters, 1230);
+  const insert = db.prepare("INSERT INTO runs (day, mode, player, name, created_at, attempt) VALUES ('2026-11-01', 'daily', 'p', 'Stary', 3, ?)");
+  insert.run(4);
+  assert.throws(() => insert.run(4));
 });
 
 test('tryb międzynarodowy został wyłączony', async () => {
