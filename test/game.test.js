@@ -179,3 +179,35 @@ test('rzadkość dynamiczna: popularne płytsze, niepopularne głębsze, "Każdy
   // zawsze co najmniej 10 m
   assert.ok(adjustMeters(10, 50, 50, 500) >= 10);
 });
+
+test('polskie memy przyjmują cytaty i aliasy, a motoryzacja polskie marki i modele', () => {
+  const mem = byId('mem');
+  assert.equal(matchAnswer(mem, 'ale urwal ale to bylo dobre').shown, 'Ale urwał');
+  const jumper = matchAnswer(mem, 'paweł jumper');
+  assert.equal(jumper.shown, 'Paweł Jumper');
+  for (const alias of ['to sie kameruje', 'Uwaga, to się kameruje!']) {
+    const match = matchAnswer(mem, alias);
+    assert.equal(match.entry, jumper.entry);
+    assert.equal(match.meters, jumper.meters);
+  }
+  assert.equal(matchAnswer(mem, 'minecraft'), null);
+
+  const cars = byId('polskie_auta');
+  assert.equal(matchAnswer(cars, 'maluch').shown, 'Fiat 126p');
+  assert.equal(matchAnswer(cars, 'jelcz').shown, 'Jelcz');
+  assert.equal(matchAnswer(cars, 'toyota'), null);
+});
+
+test('wirale i slang zaliczają rozpoznawalne skróty bez polskich znaków', () => {
+  const mem = byId('mem');
+  const slang = byId('slang');
+  assert.equal(matchAnswer(mem, 'ogolnie z plocka')?.shown, 'Ja ogólnie z Płocka jestem');
+  assert.equal(matchAnswer(mem, 'plakal')?.shown, 'Płakał, płakał');
+  assert.equal(matchAnswer(mem, 'siup siup')?.shown, 'Kolejna noc');
+  assert.equal(matchAnswer(mem, 'to kameruje')?.shown, 'Paweł Jumper');
+  assert.equal(matchAnswer(mem, 'Płock'), null);
+  assert.equal(matchAnswer(slang, '67')?.shown, '6 7');
+  assert.equal(matchAnswer(slang, 'spk')?.shown, 'spoko');
+  assert.equal(matchAnswer(slang, 'frfr')?.shown, 'fr');
+  assert.equal(matchAnswer(slang, 'farmić aurę')?.shown, 'aura farming');
+});

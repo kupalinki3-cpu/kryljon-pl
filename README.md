@@ -1,22 +1,22 @@
-# Głębia
+# Polion
 
 Krok po kroku (Windows, Linux, NixOS, logowanie do Cloudflare): [TUTORIAL.md](TUTORIAL.md).
 
 Polska gra w stylu Krillion: 7 pytań, 25 sekund na odpowiedź. Każda odpowiedź ma w bazie własną głębokość w metrach: powszechna jak „Paweł Jumper” to ok. 200 m, a mało znany polski twórca z kilkoma tysiącami obserwujących to kilka tysięcy metrów. Głębokość się sumuje i nie ma sufitu.
 
-Dwa tryby:
+Tryby gry:
 
 - **rankingowy**: raz dziennie, te same pytania dla wszystkich, ranking Dziś / Wczoraj, anonimowi gracze z pseudonimem;
-- **swobodny**: dowolnie wiele gier, losowe pytania, bez rankingu.
+- **swobodny**: losowe pytania z polskiej bazy, bez rankingu.
 
-Odpowiedź, której nie ma w bazie, nie kończy pytania („brak echa”): można próbować dalej, dopóki płynie czas.
+Odpowiedź, której nie ma w bazie, nie kończy pytania („brak echa”): można próbować dalej, dopóki płynie czas. W kategorii polskich memów wpisz nazwę mema, tytuł filmiku albo jego rozpoznawalny cytat. Gra sprawdza listę odpowiedzi i aliasów, np. „Ale urwał” i „ale urwal ale to bylo dobre” prowadzą do tego samego wpisu.
 
 Stos: Cloudflare Worker + D1 + pliki statyczne z `public/`. Bez zależności w runtime.
 
 ## Uruchomienie
 
 ```
-npm test                      # 37 testów: silnik, rzadkość dynamiczna, treść, API (oba tryby, brak echa, migracja 0002)
+npm test                      # silnik, rzadkość odpowiedzi, treść, API i migracja
 npm start                     # gra lokalnie na http://localhost:8787, bez Cloudflare
 npx wrangler d1 create glebia # wpisz zwrócone database_id do wrangler.toml
 npm run db:migrate:local      # migracje lokalnie
@@ -31,11 +31,11 @@ Wersje wranglera i `compatibility_date` w `wrangler.toml` nie były tu sprawdzan
 ## Zasady, które trzeba znać
 
 - **Czas liczy serwer.** Pierwsze pobranie pytania ustawia start (+3 s na przeczytanie). Odpowiedź po 25 s + 1,5 s tolerancji dostaje 409, pytanie liczy się jako puste.
-- **Pytania dnia** są losowane deterministycznie z daty (Europe/Warsaw) i zapisywane w tabeli `days`. **Nigdy nie usuwaj ani nie zmieniaj `id` kategorii** w `src/content/`, bo zepsujesz stare dni.
+- **Pytania dnia** są losowane deterministycznie z daty (Europe/Warsaw) i zapisywane w tabeli `days`. Zachowuj identyfikatory kategorii. Przy wznowieniu zapisanej gry kategorie spoza puli zastępują pytania z puli danego trybu.
 - **Dopasowanie odpowiedzi:** bez wielkości liter i polskich znaków, dokładne, potem literówki (tylko nazwy ≥ 7 znaków, cyfry muszą się zgadzać, wynik musi być jednoznaczny).
 - **Głębokości są redakcyjne i niekalibrowane.** Wpis w treści ma postać `[metry, "nazwa", ...aliasy]`; pomocniki `group`, `cat` i `jit` z `src/content/util.js` zapisują grupy wpisów o podobnej głębokości (z deterministycznym rozrzutem ±20%). Pasma na ekranie: do 200 m „Każdy zna”, do 500 „Znane”, do 1500 „Niezłe”, do 4000 „Rzadkie”, do 10000 „Głębinowe”, dalej „Legenda głębin”. Punkty to metry / 10.
 - **Brak echa:** nieznana odpowiedź nie jest zapisywana jako wynik, zegar biegnie dalej, a próba trafia do tabeli `misses` (maks. 40 prób na pytanie). Gdy czas minie bez trafienia, pytanie liczy się jako 0 m.
-- **Tryb swobodny:** losowe pytania zapisane w `runs.prompts`, limit 60 nowych gier na godzinę na gracza, wyniki nie wchodzą do rankingu.
+- **Tryb swobodny:** losowe pytania zapisane w `runs.prompts`, limit 60 nowych gier na godzinę na gracza, wyniki poza rankingiem.
 - **Tożsamość:** token w localStorage, w bazie tylko jego skrót SHA-256. Wyczyszczenie localStorage pozwala zagrać drugi raz tego samego dnia.
 
 ## Rozbudowa bazy
@@ -46,7 +46,7 @@ Baza jest punktem startowym i rośnie razem z graczami: nie zna wszystkiego, co 
 
 - `src/game.js` – czysta logika (normalizacja, dopasowanie, daty, losowanie)
 - `src/index.js` – API Workera
-- `src/content/` – 113 kategorii, ok. 12 700 wpisów (nauka, przyroda, geografia, miejsca, kultura, ludzie, sport i szkoła, internet)
+- `src/content/` – 54 kategorie związane z Polską, ponad 11 600 odpowiedzi i ich aliasy. Dane geograficzne pochodzą m.in. z [rejestru TERYT GUS](https://eteryt.stat.gov.pl/), a potrawy i napoje m.in. z [Listy Produktów Tradycyjnych MRiRW](https://www.gov.pl/web/rolnictwo/lista-produktow-tradycyjnych12), a uczelnie z [rejestru POL-on](https://radon.nauka.gov.pl/pomoc/knowledge-base/414/).
 - `migrations/` – `0001_init.sql` (schemat D1), `0002_modes_meters.sql` (tryby, metry, tabela `misses`), `0003_popularity_index.sql` (indeks pod rzadkość dynamiczną)
 - `public/` – front: `scene.js` (pikselartowe morze na canvasie), `app.js` (logika), `style.css`, `index.html`. Czcionka Pixelify Sans ładuje się z Google Fonts, bez sieci wchodzi monospace
 - `test/` – testy (`d1shim.js` emuluje D1 na `node:sqlite`)

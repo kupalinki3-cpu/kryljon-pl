@@ -411,3 +411,36 @@ test('migracja 0002: przelicza stare punkty na metry i zachowuje biegi oraz odpo
   for (let i = 0; i < 3; i++) db.prepare("INSERT INTO runs (day, mode, player, name, created_at) VALUES ('free', 'free', 'p', 'Luzak', 1)").run();
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM runs WHERE mode = 'free'").get().n, 3);
 });
+
+test('tryb międzynarodowy został wyłączony', async () => {
+  const result = await call(setup(), 'POST', '/api/run', { body: { token: tok(1), mode: 'international' } });
+  assert.equal(result.status, 400);
+});
+
+test('zapisane światowe pytanie w polskim trybie dostaje polski zamiennik', async () => {
+  const env = setup();
+  const token = tok(1);
+  await call(env, 'POST', '/api/run', { body: { token, ...FREE } });
+  const oldIds = ['marka_auta', ...PROMPTS.slice(0, PROMPTS_PER_DAY - 1).map((p) => p.id)];
+  env.DB.raw.prepare("UPDATE runs SET prompts = ? WHERE mode = 'free'").run(JSON.stringify(oldIds));
+  const prompt = await call(env, 'POST', '/api/prompt', { body: { token, ...FREE } });
+  assert.equal(prompt.status, 200);
+  assert.ok(PROMPTS.slice(PROMPTS_PER_DAY - 1).some((p) => p.text === prompt.json.text));
+});
+
+test('pytanie o polskie napoje zalicza kompot i jego domowe warianty', async () => {
+  const env = setup();
+  const token = tok(1);
+  const ids = ['napoj', ...PROMPTS.filter((p) => p.id !== 'napoj').slice(0, PROMPTS_PER_DAY - 1).map((p) => p.id)];
+  env.DB.raw.prepare('INSERT INTO days (day, prompts) VALUES (?, ?)').run(DAY, JSON.stringify(ids));
+  await call(env, 'POST', '/api/run', { body: { token, name: 'Kompot' } });
+  const prompt = await call(env, 'POST', '/api/prompt', { body: { token } });
+  assert.match(prompt.json.text, /napój/);
+  const answer = await call(env, 'POST', '/api/answer', {
+    body: { token, idx: 0, answer: 'Kompot z suszu' },
+    now: T0 + INTRO_MS + 1500,
+  });
+  assert.equal(answer.status, 200);
+  assert.equal(answer.json.result.shown, 'Kompot');
+  assert.ok(answer.json.result.meters > 0);
+});

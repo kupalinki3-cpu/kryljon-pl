@@ -115,7 +115,29 @@ button:focus-visible, input:focus-visible, dialog:focus-visible { outline: 3px s
 
 .panel { width: min(560px, 100%); padding: 22px 28px 16px; }
 .panel.wide { width: min(640px, 100%); }
-.logo { margin: 0 0 6px; font-size: clamp(3.2rem, 11vw, 5.6rem); line-height: 1; color: var(--cyan); letter-spacing: 0.03em; text-shadow: 0 5px 0 #0b3b66, 0 10px 0 rgba(0, 0, 0, 0.3); }
+.logo {
+  margin: 0 0 8px;
+  font-size: clamp(3.1rem, 12vw, 6rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #fff;
+  filter: drop-shadow(4px 4px 0 #6b102d) drop-shadow(0 4px 0 #040914);
+}
+.logo span {
+  display: inline-block;
+  background: linear-gradient(#fff 0 50%, #ef3151 50% 100%);
+  background-clip: text;
+  color: transparent;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .logo span { animation: logo-bob 3s steps(1, end) infinite; }
+}
+@keyframes logo-bob {
+  25%, 75% { transform: translateY(-2px); }
+  50% { transform: translateY(-4px); }
+}
 .lead { margin: 10px 0 10px; color: var(--ink); max-width: 46ch; }
 .note { margin: 12px 0 0; font-size: 0.85rem; color: var(--muted); }
 label { display: block; margin: 8px 0 8px; color: var(--muted); font-size: 0.95rem; }
@@ -244,3 +266,30 @@ dialog::backdrop { background: rgba(2, 6, 15, 0.7); }
   #toast { transition: none; }
 }
 .btn.big { text-shadow: none; }
+
+/* Pikselowe ilustracje na panelach, wycinane z jednej planszy. */
+.screen-art {
+  display: block;
+  width: var(--art-size, 64px);
+  height: var(--art-size, 64px);
+  background: url('/art/ikony.png') 0 0 / 200% 200% no-repeat;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+#view-start .panel, #view-final .panel, .reveal { position: relative; }
+.compass, .sonar, .treasure { position: absolute; top: 8px; right: 10px; }
+.sonar { background-position: 100% 0; --art-size: 56px; }
+.treasure { background-position: 0 100%; --art-size: 84px; }
+.podium { background-position: 100% 100%; --art-size: 48px; margin: -6px auto; }
+.prompt-panel .prompt { padding-right: 44px; }
+.reveal {
+  padding: 24px 62px 22px 24px;
+  background-color: rgb(10 26 48 / 94%);
+}
+@media (max-width: 720px) {
+  .compass { --art-size: 51px; top: 10px; right: 5px; }
+  .sonar { --art-size: 45px; top: 5px; right: 4px; }
+  .treasure { --art-size: 54px; top: 6px; right: 5px; }
+  .prompt-panel .prompt { padding-right: 30px; }
+  .reveal { padding: 16px 35px 16px 12px; }
+}

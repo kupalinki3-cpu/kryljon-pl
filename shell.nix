@@ -9,7 +9,7 @@ pkgs.mkShell {
   ];
 
   shellHook = ''
-    echo "Głębia: node $(node -v)"
+    echo "Polion: node $(node -v)"
     echo "Testy:        npm test"
     echo "Dev (workerd): steam-run npm run dev"
   '';

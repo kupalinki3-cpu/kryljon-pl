@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Głębia: codzienna polska gra o najrzadszych odpowiedziach (Cloudflare Worker + D1)",
+  "description": "Polion: codzienna polska gra o najrzadszych odpowiedziach (Cloudflare Worker + D1)",
   "scripts": {
     "test": "node --test --no-warnings test/*.test.js",
     "start": "node --no-warnings server.js",

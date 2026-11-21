@@ -57,7 +57,7 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Głębia działa na http://localhost:${PORT}`);
+  console.log(`Polion działa na http://localhost:${PORT}`);
   console.log(`Baza: ${DB_FILE}`);
   if (!process.env.ADMIN_TOKEN) console.log('ADMIN_TOKEN nie ustawiony: /api/admin/unmatched jest zamknięty.');
 });

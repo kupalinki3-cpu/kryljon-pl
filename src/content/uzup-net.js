@@ -1,4 +1,7 @@
-// Uzupełnienia: polski internet, memy, stereotypy, twórcy, napoje. Tylko nazwy znane z polskiej kultury internetu.
+// Polski internet: tytuły, cytaty, pseudonimy i nazwy kanałów.
+// https://mapainternetow.pl/maps/1
+// https://pl.wikipedia.org/wiki/Kapitan_Bomba
+// https://en.wikipedia.org/wiki/Cenzopapa
 import { group } from './util.js';
 
 export default {
@@ -12,6 +15,23 @@ export default {
     ['Lord Kruszwil', 'Kruszwil'], ['Kuba Klawiter', 'Klawiter'], ['Budda', 'Budda Youtuber'], ['Friz', 'Friz Youtuber'], ['Maffashion', 'Julia Mafaszion'],
     ['Blowek', 'Błowek'], ['Wojtek Gola', 'Gola'], ['Rafonix', 'Rafał Rafonix'], ['Anelka'], ['Dobrodziej'], ['Gimper', 'Gimper'],
     ['Izak', 'Izak Youtuber'], ['Mixer', 'Mixer Streamer'], ['Ewron'],
+    ...group(170, ['Ekipa', 'Ekipa Friza'], ['Genzie', 'GenZie'], 'Fausti', 'Hi Hania', 'Świeży',
+      ['Natsu', 'Natalia Karczmarczyk'], ['Wersow', 'Weronika Sowa'], ['Wujek Łuki', 'Wujek Luki'],
+      ['Kanał Zero', 'Krzysztof Stanowski', 'Stanowski'], ['Kanał Sportowy'], 'Xayoo', 'Kasti',
+      'Zony', 'Nitrozyniak', 'Unboxall', ['Drwal Rębajło', 'Drwal Rebajlo'],
+      'Kamerzysta', 'OjWojtek', 'Prawdziwy Geniusz'),
+    ...group(330, 'Ajgor Ignacy', 'Reżyser Życia', 'Beksy', 'Ponki', 'Na Pełnej', 'Matura To Bzdura',
+      ['Zapytaj Beczkę', 'Beczka'], ['Cezary Pazura', 'Wujek Czarek'], 'Rafał Masny', 'Czarek Jóźwik',
+      'Robert Pasut', 'To Już Jutro', ['Jakub Dębski', 'Dem', 'Dem3000'], ['Z Dupy', 'Maciej Dąbrowski', 'Warga'],
+      'Ignacy z Japonii', 'Strefa Czytacza', 'Michał Pisarski',
+      'MafiaSolec', ['Jan Dąbrowski', 'JDabrowsky', 'Jaś Dąbrowski'], 'Terefere', 'Remigiusz Maciaszek'),
+    ...group(450, 'Sheo', 'Sitr0x', 'Madzia', 'Enzzi', 'Kolega Ignacy', 'Kamil in Travel',
+      ['Busem Przez Świat', 'Karol Lewandowski'], 'Vlog Casha', 'Autostopem Na Koniec Świata',
+      'Gastronauta', 'Maciej Je', 'Jakub Kuroń', 'Tomasz Strzelczyk', 'Ania Gotuje', 'Jola Gotuje',
+      'Kacper Pitala', 'Dla Pieniędzy', 'Wielmożny Igor', 'NRGeek', 'Make Life Harder'),
+    ['Niekryty Krytyk', 'Maciej Frączyk'], ['Izak', 'Piotr Skowyrski'],
+    ['Kuba Klawiter', 'Tech Week'], ['AdBuster', 'Marek Hoffmann'],
+    ['Rock Alone', 'Rock', 'Remigiusz Rock'], ['Klocuch', 'Klocuch12'],
   ],
   mem: [
     ...group(130, ['Janusz', 'Janusz biznesu', 'Pan Janusz'], ['Karyna', 'Karen'], ['Seba', 'Sebix', 'Sebastian'], ['Grażyna', 'Pani Grażyna']),
@@ -20,6 +40,30 @@ export default {
     ...group(450, ['Baba z okienka', 'Pani w okienku'], ['Proszę pana', 'No proszę pana'], ['Niedzielny kierowca', 'niedzielny'], ['Pan Heniek', 'Heniek'], ['Kolega Zdzisia', 'Zdzisio'], ['Mirek', 'Pan Mirek'],
       ['Dżesika', 'Jessica'], ['Brajan', 'Brajanek'], ),
     ...group(800, ['Gimbus', 'Gimbaza', 'gimbaza'], ['Cebula', 'Cebula Polak'], ['Pani Krysia', 'Krysia'], ['Studenciak', 'student'], ),
+    ['Paweł Jumper', 'Pawel Dzamper', 'Uwaga to już się kameruje', 'To sie kameruje uwaga'],
+    ['Ale urwał', 'Ale urwał ależ to było dobre', 'Ale urwał ależ to było dobre!'],
+    ['Moje pole', 'Moje pole mem', 'Kurwa moje pole', 'O kurwa moje pole'],
+    ['Daj kamienia', 'Dajcie kamienia', 'Daj kamień mem'], ['Laguna', 'Lagun z Krakowa', 'Krakowski lagun'],
+    ['Pasta o wędkarzu', 'Ojciec wędkarz', 'Fanatyk', 'Fanatyk wędkarz'],
+    ['Mięsny jeż', 'Mięsny jeż ty go zjesz'], ['Będę grał w grę', 'W jaką tomb raider'],
+    ['Papieżowa godzina', 'godzina papieska', 'godzina 2137'], ['Kononowicz', 'Żeby nie było niczego'],
+    ...group(220, ['Kapitan Bomba', 'Bomba Walaszka', 'Kapitan Bomba mem'],
+      ['Blok Ekipa', 'Spejson', 'Wojtas', 'Walo'], ['Cenzopapa', 'Cenzopapy'],
+      ['Pan Andrzej', 'Pan Andrzej mem'], ['Pasta o serwerowni', 'Pasta serwerownia', 'Serwerownia'],
+      ['Nurek z Jaworzna', 'Nurek Jaworzno'], ['Pijany Adam Małysz', 'Małysz pijany'],
+      ['Najman szuka Stanowskiego', 'Marcin Najman szuka Stanowskiego', 'Gdzie jest Stanowski'],
+      ['Suzuki nad rondem', 'Lot Suzuki nad rondem', 'Latające Suzuki Swift'],
+      ['Idiota i znak', 'Idiota ze znakiem'], ['Jak kupisz mi jeansy, to zrobię', 'Jak kupisz mi dżinsy'],
+      ['Gdzie jest krzyż', 'Gdzie jest krzyż?'], ['Orzeł', 'Orzeł mem'], ['Dej no dwa złote', 'Dej no 2 złote']),
+    ...group(450, ['Upierdolony stół', 'Upie***ony stół', 'Upie**ny stół', 'Upier stół'],
+      ['Otwieranie szampana', 'Jak otworzyć szampana mem'],
+      ['Sosnowiec memy', 'Sosnowiec mem', 'Sosnowiec to nie Śląsk'],
+      ['Typowy Mirek z Wykopu', 'Mirek z Wykopu'], ['Lenny Face na Wykopie', 'Lenny Wykop'],
+      ['Kuc i kuce', 'Kuc mem', 'Kuce Korwina'], ['Szlachta nie pracuje', 'Szlachta nie pracuje mem'],
+      ['To jest amelinium', 'Amelinium', 'Tego nie pomalujesz', 'Aluminium mem', 'Panie, to jest amelinium'],
+      ['Ojciec, prać?', 'Ojciec prac', 'Ojciec prać'], ['Piesek Leszek', 'Pies Leszek'],
+      ['Ja już nic nie mówię', 'Ja juz nic nie mowie'], ['Zaraz będzie ciemno', 'Zaraz bedzie ciemno'],
+      ['Siara i Wąski', 'Wąski', 'Siara mem'], 'Kuce z Bronksu'),
   ],
   stereotyp: [
     ...group(110, ['Janusz', 'Janusz biznesu', 'Pan Janusz'], ['Grażyna', 'Pani Grażyna'], ['Karyna', 'Karen'], ['Polak pijak', 'pijak', 'Polak alkoholik', 'Polak lubi wypić', 'Polacy piją']),
@@ -38,15 +82,10 @@ export default {
       ['Rowerzysta', 'Typowy rowerzysta'], ['Warszawiak', 'Cwaniak z Warszawy', 'Warszawka'], ['Krakus', 'Krakowiak'], ['Góral', 'Górale', 'Góral z Zakopanego'], ['Ślązak', 'Ślonzok', 'Hanys'], ['Poznaniak', 'Pyra', 'Pyra z Poznania'],
       ['Lubelak', 'Lublinianin']),
   ],
-  napoj: [
-    ...group(110, ['wódka', 'Wódka', 'wóda', 'Wóda', 'wódeczka', 'Wódeczka', 'wódzia', 'Wódzia'], ['piwo', 'Piwo', 'piwko', 'Piwko', 'browar', 'Browar'], ['woda', 'Woda', 'woda mineralna'],
-      ['kompot', 'Kompot'], ['herbata', 'Herbata'], ['kawa', 'Kawa'], ['sok', 'Sok', 'soczek'], ['mleko', 'Mleko'], ['cola', 'Coca-Cola', 'Coca Cola', 'Pepsi', 'Cola']),
-    ...group(250, ['oranżada', 'Oranżada', 'oranżadka'], ['kwas chlebowy', 'Kwas chlebowy', 'kwas'], ['kefir', 'Kefir'], ['maślanka', 'Maślanka'], ['sok jabłkowy', 'Sok jabłkowy'], ['woda gazowana', 'woda niegazowana'],
-      ['piwo bezalkoholowe', 'Piwo bezalkoholowe'], ['szampan', 'Szampan'], ['wino', 'Wino', 'winko', 'Winko', 'wino owocowe', 'Wino owocowe'], ['likier', 'Likier'], ['nalewka', 'Nalewka', 'nalewka domowa'],
-      ['samogon', 'Samogon', 'bimber', 'Bimber', 'księżycówka'], ['spirytus', 'Spirytus', 'Spirytus Rektyfikowany'], ['Lemoniada', 'lemoniada'], ['kakao', 'Kakao'], ['Pepsi', 'Pepsi']),
-    ...group(450, ['Mocny Full', 'Mocny Full'], ['Harnaś', 'Harnaś'], ['Dębowe Mocne', 'Dębowe'], ['Tyskie', 'Tyskie'], ['Lech Premium', 'Lech'], ['Warka', 'Warka Strong'], ['EB', 'Specjal'], ['Żywiec', 'Żywiec Porter'], ['Miodula', 'Miodula'], ['Piwo Okocim', 'Okocim'], ['Piwo Tatra', 'Tatra'], ['Kustosz', 'Kustosz'], ['Królewskie', 'Królewskie'], ['Zubr', 'Żubr'], ['Książęce', 'Książęce'], ['Łomża', 'Łomża'], ['Perła', 'Perła'], ['Fanta', 'Fanta'], ['Sprite', 'Sprite'],
-      ['7up', '7 Up', '7up'], ['Mirinda', 'Mirinda'], ['Kropla Beskidu', 'Kropla Beskidu'], ['Soplica', 'Soplica'], ['Żołądkowa Gorzka', 'Żołądkowa Gorzka'], ['Śliwowica', 'Śliwowica'],
-      ['Napój energetyczny', 'Red Bull', 'Redbull', 'Monster', 'Tiger', 'Burn']),
-    ...group(900, ['Miód pitny', 'miód', 'Półtorak', 'Dwójniak', 'Trójniak', 'Czwórniak'], ['Cydr', 'Cydr Lubelski', 'Cydr Lubelski'], ['Sok z kiszonej kapusty', 'sok z kiszonki'], ['Śliwowica Łącka', 'Śliwowica Łącka']),
+  serial: [
+    ...group(400, 'Kapitan Bomba', ['Blok Ekipa', 'Blokekipa'],
+      ['Bogdan Boner: Egzorcysta', 'Egzorcysta', 'Bogdan Boner', 'Egzorcysta Walaszka'],
+      ['Włatcy móch', 'Władcy much'], 'Piesek Leszek', 'Generał Italia', 'Miś Push-Upek',
+      'Laserowy Gniew Dzidy', 'Galaktyczne Lektury', 'Kuce z Bronksu'),
   ],
 };

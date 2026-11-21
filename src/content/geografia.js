@@ -29,7 +29,7 @@ export default [
       [1920,"Woliński","Woliński Park Narodowy"], [2290,"Roztoczański","Roztoczański Park Narodowy"],
       [1780,"Poleski","Poleski Park Narodowy"], [2180,"Narwiański","Narwiański Park Narodowy"],
       [2480,"Gorczański","Gorczański Park Narodowy"], [1930,"Wigierski","Wigierski Park Narodowy"],
-      [1940,"Babiogórski","Babiogórski Park Narodowy"], [2320,"Bory Tucholskie","Park Narodowy Bory Tucholskie"],
+      [1940,"Babiogórski","Babiogórski Park Narodowy"], [2320,"Bory Tucholskie","Park Narodowy Bory Tucholskie","Park Narodowy Borów Tucholskich"],
       [5480,"Magurski","Magurski Park Narodowy"], [5580,"Drawieński","Drawieński Park Narodowy"],
       [3480,"Ujście Warty","Park Narodowy Ujście Warty"],
     ],

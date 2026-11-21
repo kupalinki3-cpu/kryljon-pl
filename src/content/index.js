@@ -13,26 +13,36 @@ import uzupKultura from './uzup-kultura.js';
 import uzupLudzie from './uzup-ludzie.js';
 import uzupReszta from './uzup-reszta.js';
 import uzupNet from './uzup-net.js';
+import uzupWirale from './uzup-wirale.js';
+import uzupKraj from './uzup-kraj.js';
+import uzupKulturaPolska from './uzup-kultura-polska.js';
+import uzupLudziePolska from './uzup-ludzie-polska.js';
+import uzupPolon from './uzup-polon.js';
 import uzupMasa from './uzup-masa.js';
 import uzupMasa2 from './uzup-masa2.js';
 import uzupMasa3 from './uzup-masa3.js';
 import uzupMasa4 from './uzup-masa4.js';
 import uzupMasa5 from './uzup-masa5.js';
-import nowe from './nowe.js';
-import nowe2 from './nowe2.js';
-import nowe3 from './nowe3.js';
-import nowe4 from './nowe4.js';
+import polskieKategorie from './polskie-kategorie.js';
+import { terytCategories, terytExtras } from './teryt.js';
+import produktyTradycyjne from './produkty-tradycyjne.js';
+import uzupPopularne from './uzup-popularne.js';
+import { wikiCategories, wikiExtras } from './uzup-wikipedia.js';
 import { normalize } from '../game.js';
 
-// Id kategorii nigdy nie usuwamy ani nie zmieniamy: zapisane dni w bazie wskazują na nie po id.
+// Zachowuj id kategorii, które pozostają w grze: zapisane rozgrywki wskazują na nie po id.
 const uzupelnienia = {};
-for (const part of [uzupelnieniaPodstawowe, uzupPrzyroda, uzupKultura, uzupLudzie, uzupReszta, uzupNet, uzupMasa, uzupMasa2, uzupMasa3, uzupMasa4, uzupMasa5]) {
+for (const part of [
+  uzupelnieniaPodstawowe, uzupPrzyroda, uzupKultura, uzupLudzie, uzupReszta, uzupNet,
+  uzupMasa, uzupMasa2, uzupMasa3, uzupMasa4, uzupMasa5, uzupPopularne, uzupWirale,
+  terytExtras, produktyTradycyjne, wikiExtras, uzupKraj, uzupKulturaPolska, uzupLudziePolska, uzupPolon,
+]) {
   for (const [id, list] of Object.entries(part)) uzupelnienia[id] = [...(uzupelnienia[id] ?? []), ...list];
 }
 
 const BASE = [
   ...nauka, ...przyroda, ...geografia, ...kultura, ...internet,
-  ...miejsca, ...ludzie, ...sportSzkola, ...polskiNet, ...nowe, ...nowe2, ...nowe3, ...nowe4,
+  ...miejsca, ...ludzie, ...sportSzkola, ...polskiNet, ...polskieKategorie, ...terytCategories, ...wikiCategories,
 ];
 
 /**

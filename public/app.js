@@ -1,13 +1,13 @@
 import { createScene } from './scene.js';
 import { sfx } from './sfx.js';
 
-// Klient gry Głębia. Wszystkie napisy od graczy trafiają do DOM wyłącznie przez textContent.
+// Klient gry Polion. Wszystkie napisy od graczy trafiają do DOM wyłącznie przez textContent.
 const LIMIT_MS = 25000; // musi zgadzać się z src/game.js; serwer i tak liczy czas sam
 const GRACE_MS = 1500;
 const TIER_SQUARES = ['⬛', '⬜', '🟦', '🟩', '🟨', '🟧', '🟪'];
 
 const $ = (id) => document.getElementById(id);
-let mode = 'daily'; // 'daily' = rankingowa, 'free' = swobodna
+let mode = 'daily';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const views = ['start', 'play', 'reveal', 'final'];
 const show = (name) => views.forEach((v) => ($(`view-${v}`).hidden = v !== name));
@@ -246,7 +246,7 @@ function enterRun(newState, newMode) {
   store.set('last', newMode);
   setDepth(state.depth, false);
   renderHud(state.idx);
-  $('play-sub').textContent = newMode === 'daily' ? '▼ im rzadsza odpowiedź, tym głębiej ▼' : '▼ swobodna gra: bez rankingu, bez limitu ▼';
+  $('play-sub').textContent = newMode === 'daily' ? '▼ im rzadsza odpowiedź, tym głębiej ▼' : '▼ gra swobodna · bez rankingu ▼';
 }
 
 async function startDaily(name) {
@@ -272,7 +272,7 @@ function updateStartButtons() {
   $('daily-title').textContent = done ? 'Dzisiejszy wynik' : 'Gra rankingowa';
   $('daily-sub').textContent = done
     ? 'Rankingowa gra na dziś ukończona. Zobacz miejsce.'
-    : 'Raz dziennie, te same pytania dla wszystkich';
+    : 'Polskie pytania, raz dziennie';
 }
 
 async function route() {
@@ -448,7 +448,7 @@ function shareText() {
   const squares = state.history.map((h) => TIER_SQUARES[h.tier] ?? '⬛').join('');
   const rank = state.me ? ` (miejsce ${state.me.rank}/${state.me.players})` : '';
   const label = mode === 'daily' ? state.day : 'gra swobodna';
-  return `Głębia ${label}\n${fmtDepth(state.depth)}${rank}\n${squares}\n${location.origin}`;
+  return `Polion ${label}\n${fmtDepth(state.depth)}${rank}\n${squares}\n${location.origin}`;
 }
 
 function showFinal() {
@@ -572,10 +572,7 @@ $('start-form').addEventListener('submit', (ev) => {
   }
   busy($('start-daily'), () => startDaily(name))();
 });
-$('start-free').addEventListener('click', () => {
-  const name = nameValue();
-  busy($('start-free'), () => startFree(name.length >= 2 && name.length <= 16 ? name : ''))();
-});
+$('start-free').addEventListener('click', busy($('start-free'), () => startFree(nameValue())));
 $('final-again').addEventListener('click', busy($('final-again'), () => startFree(store.get('name') || '')));
 $('final-menu').addEventListener('click', () => {
   stopTimer();
@@ -661,7 +658,6 @@ async function tryResumeDaily(savedName) {
     let resumed = false;
     if (last === 'free') resumed = await tryResumeFree();
     if (!resumed && savedName && store.get('day') === today.day) resumed = await tryResumeDaily(savedName);
-    if (!resumed && last !== 'free') resumed = await tryResumeFree();
     updateStartButtons();
   } catch (e) {
     toast(e.message);

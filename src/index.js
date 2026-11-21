@@ -62,40 +62,45 @@ async function playerHash(token) {
 
 // ---------- dostęp do danych ----------
 
-const ALL_IDS = PROMPTS.map((p) => p.id);
+const POLISH_IDS = PROMPTS.map((p) => p.id);
 const MAX_MISSES = 40; // prób "bez echa" na jedno pytanie
 const MODES = new Set(['daily', 'free']);
 
 /** Zamienia zapisane id na kategorie; usunięte kiedyś id zastępuje innymi, żeby stary dzień się nie wywrócił. */
-function resolvePrompts(ids) {
-  const used = new Set(ids.filter((id) => PROMPT_BY_ID.has(id)));
-  const spare = ALL_IDS.filter((id) => !used.has(id));
-  return ids.map((id) => PROMPT_BY_ID.get(id) ?? PROMPT_BY_ID.get(spare.shift()));
+function resolvePrompts(ids, pool) {
+  const allowed = new Set(pool);
+  const used = new Set(ids.filter((id) => allowed.has(id)));
+  const spare = pool.filter((id) => !used.has(id));
+  return ids.map((id) => PROMPT_BY_ID.get(allowed.has(id) ? id : spare.shift()));
 }
 
 async function dayPrompts(env, day) {
-  const ids = pickPromptIds(day, ALL_IDS);
+  const ids = pickPromptIds(day, POLISH_IDS);
   await env.DB.prepare('INSERT OR IGNORE INTO days (day, prompts) VALUES (?, ?)').bind(day, JSON.stringify(ids)).run();
   const row = await env.DB.prepare('SELECT prompts FROM days WHERE day = ?').bind(day).first();
-  return resolvePrompts(JSON.parse(row.prompts));
+  return resolvePrompts(JSON.parse(row.prompts), POLISH_IDS);
 }
 
-function randomIds(n = PROMPTS_PER_DAY) {
-  const pool = [...ALL_IDS];
+function randomIds(ids) {
+  const pool = [...ids];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  return pool.slice(0, n);
+  return pool.slice(0, PROMPTS_PER_DAY);
 }
 
-const promptsOf = (env, run) => (run.prompts ? Promise.resolve(resolvePrompts(JSON.parse(run.prompts))) : dayPrompts(env, run.day));
+
+async function promptsOf(env, run) {
+  if (!run.prompts) return dayPrompts(env, run.day);
+  return resolvePrompts(JSON.parse(run.prompts), POLISH_IDS);
+}
 
 const getRun = (env, day, player) =>
   env.DB.prepare("SELECT * FROM runs WHERE day = ? AND player = ? AND mode = 'daily'").bind(day, player).first();
 
-const getFreeRun = (env, player) =>
-  env.DB.prepare("SELECT * FROM runs WHERE player = ? AND mode = 'free' ORDER BY id DESC LIMIT 1").bind(player).first();
+const getCasualRun = (env, player, mode) =>
+  env.DB.prepare('SELECT * FROM runs WHERE player = ? AND mode = ? ORDER BY id DESC LIMIT 1').bind(player, mode).first();
 
 const getRunById = (env, id) => env.DB.prepare('SELECT * FROM runs WHERE id = ?').bind(id).first();
 
@@ -241,10 +246,10 @@ async function handleRun(request, env, now) {
   const player = await playerHash(body.token);
   const mode = modeOf(body);
 
-  if (mode === 'free') {
-    let run = await getFreeRun(env, player);
+  if (mode !== 'daily') {
+    let run = await getCasualRun(env, player, mode);
     if (body.resume) {
-      if (!run || run.finished) throw new HttpError(404, 'Brak rozpoczętej gry swobodnej');
+      if (!run || run.finished) throw new HttpError(404, 'Brak rozpoczętej gry w tym trybie');
     } else if (body.fresh || !run || run.finished) {
       const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM runs WHERE player = ? AND mode = 'free' AND created_at > ?")
         .bind(player, now - 3600_000)
@@ -252,9 +257,9 @@ async function handleRun(request, env, now) {
       if (recent.n >= 60) throw new HttpError(429, 'Za dużo nowych gier w ciągu godziny');
       const name = cleanName(body.name) ?? 'Gość';
       const info = await env.DB.prepare(
-        "INSERT INTO runs (day, mode, player, name, prompts, created_at) VALUES ('free', 'free', ?, ?, ?, ?)",
+        "INSERT INTO runs (day, mode, player, name, prompts, created_at) VALUES (?, ?, ?, ?, ?, ?)",
       )
-        .bind(player, name, JSON.stringify(randomIds()), now)
+        .bind(mode, mode, player, name, JSON.stringify(randomIds(POLISH_IDS)), now)
         .run();
       run = await getRunById(env, info.meta.last_row_id);
     }
@@ -281,7 +286,7 @@ async function handleRun(request, env, now) {
 async function loadRun(body, env, now) {
   const player = await playerHash(body.token);
   const mode = modeOf(body);
-  const run = mode === 'free' ? await getFreeRun(env, player) : await getRun(env, warsawDay(now), player);
+  const run = mode === 'daily' ? await getRun(env, warsawDay(now), player) : await getCasualRun(env, player, mode);
   if (!run) throw new HttpError(404, 'Najpierw rozpocznij nurkowanie');
   const prompts = await promptsOf(env, run);
   return { run: await settleExpired(env, run, prompts, now), prompts };

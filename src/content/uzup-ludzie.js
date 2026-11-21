@@ -47,10 +47,6 @@ export default {
     ...group(1500, 'Polonia Bytom', 'Polonia Warszawa', 'Gwardia Warszawa', 'Szombierki Bytom', 'Zawisza Bydgoszcz', 'Pogoń Lwów', 'Garbarnia Kraków', 'Hutnik Kraków', 'Wawel Kraków', 'Jutrzenka Giebułtów', 'Resovia Rzeszów', 'Stal Stalowa Wola',
       'Siarka Tarnobrzeg', 'Motor Lublin', 'Avia Świdnik', 'Lublinianka', 'Hetman Zamość', 'Olimpia Poznań', 'Amica Wronki', 'Polonia Gdańsk'),
   ],
-  lektura: [
-    ...group(250, ['Pan Tadeusz', 'Pan Tadeusz czyli ostatni zajazd na Litwie'], 'Trylogia', 'Zemsta', 'Balladyna', ['Antygona', 'Antygona Sofoklesa'], ['Edyp', 'Król Edyp'], 'Iliada', 'Odyseja', 'Biblia', 'Księga Hioba',
-      ['Bajki Krasickiego', 'Bajki', 'Bajki i przypowieści'], 'Hymn', 'Opowieść wigilijna', 'Dziadek do orzechów', 'Otello', 'Makbet', 'Hamlet', 'Romeo i Julia', 'Skąpiec', 'Świętoszek', 'Faust'),
-  ],
   uczelnia: [
     ['Uniwersytet Warszawski', 'UW'], ['Uniwersytet Jagielloński', 'UJ'], ['Akademia Górniczo-Hutnicza', 'AGH'], ['Politechnika Warszawska', 'PW'], ['Politechnika Wrocławska', 'PWr'], ['Uniwersytet im. Adama Mickiewicza', 'UAM', 'Uniwersytet Adama Mickiewicza w Poznaniu'],
     ['Uniwersytet Mikołaja Kopernika', 'UMK'], ['Uniwersytet Łódzki', 'UŁ'], ['Uniwersytet Gdański', 'UG'], ['Uniwersytet Szczeciński', 'US'], ['Uniwersytet Wrocławski', 'UWr'], ['Szkoła Główna Handlowa', 'SGH'],
@@ -72,7 +68,7 @@ export default {
   metro: [
     ...group(250, 'Kabaty', 'Natolin', 'Imielin', 'Stokłosy', 'Ursynów', 'Służew', 'Wilanowska', 'Wierzbno', 'Racławicka', 'Pole Mokotowskie', 'Politechnika', 'Centrum', 'Świętokrzyska', 'Ratusz Arsenał', 'Dworzec Gdański',
       'Plac Wilsona', 'Marymont', 'Słodowiec', 'Stare Bielany', 'Wawrzyszew', 'Młociny', 'Bemowo', 'Ulrychów', 'Księcia Janusza', 'Młynów', 'Płocka', 'Rondo Daszyńskiego', 'Rondo ONZ', 'Nowy Świat-Uniwersytet',
-      'Centrum Nauki Kopernik', 'Stadion Narodowy', 'Dworzec Wileński', 'Szwedzka', 'Targówek Mieszkaniowy', 'Trocka', 'Zacisze', 'Kondratowicza', 'Bródno', 'Dworzec Zachodni', 'Rondo Daszyńskiego', 'Nowy Świat'),
+      'Centrum Nauki Kopernik', 'Stadion Narodowy', 'Dworzec Wileński', 'Szwedzka', 'Targówek Mieszkaniowy', 'Trocka', 'Zacisze', 'Kondratowicza', 'Bródno'),
   ],
   naukowiec: [
     ...group(900, 'Jan Heweliusz', 'Jędrzej Śniadecki', 'Jan Śniadecki', 'Marian Smoluchowski', 'Stefan Kudelski', 'Kazimierz Kuratowski', 'Wacław Sierpiński', 'Hugo Steinhaus', 'Stanisław Mazur',

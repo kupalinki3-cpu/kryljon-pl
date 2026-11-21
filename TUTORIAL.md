@@ -1,4 +1,4 @@
-# Głębia: uruchomienie krok po kroku
+# Polion: uruchomienie krok po kroku
 
 Dwa tryby: **lokalnie** (do grania, bez konta i bez wranglera) i **na Cloudflare** (żeby gra była w sieci). Zacznij od lokalnego.
 
@@ -114,7 +114,7 @@ Wrangler wypisze adres w stylu `https://glebia.<twoja-nazwa>.workers.dev`. Włas
 
 Po zmianach w kodzie lub treści: `npm test`, potem `npm run deploy`. Migracje bazy uruchamiasz tylko, gdy w `migrations/` pojawi się nowy plik: `npm run db:migrate:remote`.
 
-**Nigdy nie usuwaj ani nie zmieniaj `id` kategorii w `src/content/`.** Pytania dnia są losowane po tych identyfikatorach, więc zmiana zepsuje stare dni.
+Zachowuj identyfikatory kategorii w `src/content/`, ponieważ odwołują się do nich zapisane rozgrywki.
 
 ## 5. Rozbudowa bazy odpowiedzi
 

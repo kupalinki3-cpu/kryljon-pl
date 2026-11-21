@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#02060f">
   <meta name="description" content="Codzienna polska gra: wpisz jak najrzadszą odpowiedź i zanurkuj jak najgłębiej.">
-  <title>Głębia – codzienne nurkowanie w polskiej wiedzy</title>
+  <title>Polion – codzienne nurkowanie w polskiej wiedzy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -42,7 +42,8 @@
 
     <section id="view-start" class="view center">
       <div class="panel px">
-        <h1 class="logo">Głębia</h1>
+        <h1 class="logo"><span>Polion</span></h1>
+        <i class="screen-art compass" aria-hidden="true"></i>
         <p class="lead">Siedem pytań, 25 sekund na każde. Im rzadsza odpowiedź, tym głębiej zejdziesz, a dna nie ma. Brak echa to nie pudło: próbuj dalej, dopóki płynie czas.</p>
         <form id="start-form" autocomplete="off">
           <label for="name">Pseudonim w rankingu</label>
@@ -50,11 +51,11 @@
           <div class="modes">
             <button type="submit" class="btn mode" id="start-daily">
               <b id="daily-title">Gra rankingowa</b>
-              <small id="daily-sub">Raz dziennie, te same pytania dla wszystkich</small>
+              <small id="daily-sub">Polskie pytania, raz dziennie</small>
             </button>
             <button type="button" class="btn cyan mode" id="start-free">
               <b>Gra swobodna</b>
-              <small>Bez limitu, losowe pytania, bez rankingu</small>
+              <small>Polskie pytania, bez rankingu</small>
             </button>
           </div>
         </form>
@@ -73,6 +74,7 @@
 
     <section id="view-play" class="view" hidden>
       <div class="prompt-panel px">
+        <i class="screen-art sonar" aria-hidden="true"></i>
         <h2 id="play-prompt" class="prompt"></h2>
         <p class="sub" id="play-sub">▼ im rzadsza odpowiedź, tym głębiej ▼</p>
       </div>
@@ -94,7 +96,8 @@
     </section>
 
     <section id="view-reveal" class="view center" hidden>
-      <div class="reveal">
+      <div class="reveal px">
+        <i class="screen-art sonar" aria-hidden="true"></i>
         <div class="badge" id="reveal-badge"></div>
         <p id="reveal-line" class="reveal-line"></p>
         <p class="points" id="reveal-points"></p>
@@ -109,6 +112,7 @@
 
     <section id="view-final" class="view center" hidden>
       <div class="panel px wide">
+        <i class="screen-art treasure" aria-hidden="true"></i>
         <h2 class="final-title" id="final-title">Dno osiągnięte</h2>
         <p class="big" id="final-depth"></p>
         <p id="final-badge" class="record" hidden></p>
@@ -132,6 +136,7 @@
   <dialog id="board" class="px">
     <div class="board-head">
       <h2>Ranking dnia</h2>
+      <i class="screen-art podium" aria-hidden="true"></i>
       <button type="button" class="btn ghost icon" id="board-close" aria-label="Zamknij ranking">✕</button>
     </div>
     <div class="tabs" role="tablist">

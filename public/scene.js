@@ -1,5 +1,5 @@
 // Scena: morze w pikselartowym stylu, bez dna. Rysowane na canvasie o niskiej rozdzielczości i skalowane bez wygładzania.
-// Wszystkie sprite'y są rysowane kodem (prostokąty), bez zewnętrznych plików.
+// Główne stworzenia korzystają z pikselowych ilustracji, a proste sprite’y są rysowane kodem.
 // Świat poniżej powierzchni jest generowany kawałkami (chunkami) deterministycznie z numeru kawałka,
 // więc głębokość może rosnąć bez limitu, a stworzenia zależą od głębokości.
 
@@ -41,6 +41,41 @@ function sprite(w, h, draw) {
   }, x);
   return c;
 }
+// Kadry z oryginalnej planszy mają ciemnogranatowe tło. Kluczujemy je po kolorze,
+// a ilustracje zostają w oryginalnym pliku.
+function artSprite(image, rect, width, height, opaque) {
+  return sprite(width, height, (_r, ctx) => {
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(image, ...rect, 0, 0, width, height);
+    if (!opaque) return;
+    const frame = ctx.getImageData(0, 0, width, height);
+    const pixels = frame.data;
+    for (let i = 0; i < pixels.length; i += 4) {
+      const [red, green, blue] = [pixels[i], pixels[i + 1], pixels[i + 2]];
+      if (red < 24 && green < 27 && blue < 61) pixels[i + 3] = 0;
+    }
+    ctx.putImageData(frame, 0, 0);
+  });
+}
+
+function drawSwim(ctx, image, x, y, tailOnLeft, bend, flip = false) {
+  const { width, height } = image;
+  const tailWidth = Math.round(width * 0.27);
+  ctx.save();
+  ctx.translate(x + (flip ? width : 0), y);
+  if (flip) ctx.scale(-1, 1);
+  // Przesuwamy grzbiet ogona stopniowo po pikselu, korpus pozostaje nieruchomy.
+  const tailX = tailOnLeft ? 0 : width - tailWidth;
+  const bodyX = tailOnLeft ? tailWidth : 0;
+  ctx.drawImage(image, bodyX, 0, width - tailWidth, height, bodyX, 0, width - tailWidth, height);
+  for (let i = 0; i < tailWidth; i += 1) {
+    const distance = tailOnLeft ? tailWidth - i : i;
+    const offset = Math.round(bend * distance / tailWidth);
+    ctx.drawImage(image, tailX + i, 0, 1, height, tailX + i, offset, 1, height);
+  }
+  ctx.restore();
+}
+
 function flipped(src) {
   return sprite(src.width, src.height, (_r, x) => {
     x.translate(src.width, 0);
@@ -77,12 +112,12 @@ const anglerR = sprite(20, 14, (R) => {
 });
 const anglerL = flipped(anglerR);
 
-// Krewetka na żyłce: 15x11 px, dwie klatki (nóżki i wachlarz ogona), odblask na grzbiecie, czułki.
+// Kryl na żyłce: 15×11 px, trzy klatki ruchu odnóży, ogona i czułków.
 const KRILL_W = 15;
 const KRILL_H = 11;
 const KRILL_PAL = {
-  r: '#ff5c7a', l: '#ffa3b5', d: '#bf3556', D: '#8f2442', w: '#ffffff', k: '#1a0a12',
-  a: '#ffd9e0', t: '#ff7d94', g: '#e84a6a',
+  r: '#ef3151', l: '#fff7fa', d: '#b62542', D: '#86132d', w: '#ffffff', k: '#1a0a12',
+  a: '#fff7fa', t: '#f97990', g: '#f7dce2',
 };
 function krillFrame(rows) {
   return sprite(KRILL_W, KRILL_H, (R) => {
@@ -116,6 +151,20 @@ const krillB = krillFrame([
   '...............',
 ]);
 
+const krillC = krillFrame([
+  '.........a..a..',
+  '..........a.a..',
+  '....lllll..a...',
+  '..llrrrrrrrr...',
+  '.llrrdrrdrrrwk.',
+  'tlrrd.rrd.rrrrr',
+  'trrd..drd..rrd.',
+  't..d...d...ggD.',
+  '........g.g.g..',
+  '.........g.g.g.',
+  '...............',
+]);
+const krillFrames = [krillA, krillB, krillC, krillB];
 
 // ---- nowe stworzenia (sprite'y generowane kodem) ----
 const rowsSprite = (pal, rows) =>
@@ -296,6 +345,7 @@ function makeChunk(ci) {
       const r = rand();
       if (r < 0.25) creatures.push({ kind: 'angler', wy, fx: rand(), sp: (2 + rand() * 3) * d, ph: rand() * 6 });
       else if (r < 0.5) creatures.push({ kind: 'jellyBig', wy, fx: rand(), sp: 1.2 * d, ph: rand() * 6 });
+      else if (r < 0.63) creatures.push({ kind: 'isopod', wy, fx: rand(), sp: 2 * d, ph: rand() * 6 });
       else if (r < 0.8) creatures.push({ kind: 'eyes', wy, fx: rand(), sp: 0, ph: rand() * 6 });
       else creatures.push({ kind: 'ribbon', wy, fx: rand(), sp: 4 * d, ph: rand() * 6 });
     }
@@ -337,6 +387,27 @@ export function createScene(canvas, { onFrame } = {}) {
   let S = 4, W = 0, H = 0;
   let shown = 0, target = 0, from = 0, t0 = -1, dur = 1;
   let dirty = true;
+  let krillArt, anglerArt, jellyArt, isopodArt, cave;
+  let kelp, coral, trawler;
+  const loadArt = (file, onLoad) => {
+    const image = new Image();
+    image.onload = () => { onLoad(image); dirty = true; };
+    image.src = new URL(file, import.meta.url);
+  };
+  loadArt('./art/glebiny.png', (image) => {
+    krillArt = artSprite(image, [77, 145, 565, 420], 24, 18, true);
+    anglerArt = artSprite(image, [1488, 95, 665, 472], 65, 46, true);
+    cave = artSprite(image, [724, 5, 724, 714], 230, 227, false);
+  });
+  loadArt('./art/morze.png', (image) => {
+    kelp = artSprite(image, [765, 12, 387, 573], 24, 36, false);
+    coral = artSprite(image, [34, 731, 568, 385], 48, 33, false);
+    trawler = artSprite(image, [677, 698, 565, 410], 64, 46, false);
+  });
+  loadArt('./art/stworzenia.png', (image) => {
+    jellyArt = artSprite(image, [65, 638, 484, 596], 23, 29, false);
+    isopodArt = artSprite(image, [631, 734, 615, 391], 43, 27, false);
+  });
   let nextBubble = 0;
   let lastNow = 0;
   let prevPx = 0;
@@ -424,6 +495,31 @@ export function createScene(canvas, { onFrame } = {}) {
     ctx.fillRect(Math.round(x), Math.round(y), w, h);
   }
 
+  function drawKelp(x, y, phase) {
+    // Kołyszą się końce liści, a podstawa zostaje na miejscu.
+    for (let row = 0; row < kelp.height; row += 2) {
+      const bend = Math.round(Math.sin(phase + row * 0.16) * 3 * (1 - row / kelp.height));
+      ctx.drawImage(kelp, 0, row, kelp.width, 2, x + bend, y + row, kelp.width, 2);
+    }
+  }
+
+  function drawSeascape(chunk, t, camY, surfaceY) {
+    if (!kelp || chunk > 8) return;
+    const rand = rng(2903 + chunk);
+    const count = chunk === 0 ? 5 : 3;
+    for (let i = 0; i < count; i += 1) {
+      const x = Math.round(rand() * W);
+      const floor = chunk * CH + 36 + i * (CH - 55) / count;
+      const y = Math.round(floor - camY);
+      if (y < surfaceY || y < -8 || y > H + 36) continue;
+      if (i % 2 === 0 || chunk === 0) {
+        drawKelp(x, y - kelp.height, t * 1.6 + i);
+      } else if (coral) {
+        ctx.drawImage(coral, x, y - coral.height);
+      }
+    }
+  }
+
   function drawCreature(c, t, camY, surfaceY) {
     const y = Math.round(c.wy - camY + Math.sin(t * 0.8 + c.ph) * 2);
     if (y < -24 || y > H + 24 || y < surfaceY + 2) return;
@@ -433,7 +529,12 @@ export function createScene(canvas, { onFrame } = {}) {
     switch (c.kind) {
       case 'fishS': ctx.drawImage(right ? fishS : fishSL, x, y); break;
       case 'fishM': ctx.drawImage(right ? fishM : fishML, x, y); break;
-      case 'jellyCyan': ctx.drawImage(jellyCyan, x, y + Math.round(Math.sin(t * 1.5 + c.ph) * 3)); break;
+      case 'jellyCyan':
+        ctx.drawImage(jellyArt ?? jellyCyan, x, y + Math.round(Math.sin(t * 1.5 + c.ph) * 3));
+        break;
+      case 'isopod':
+        if (isopodArt) drawSwim(ctx, isopodArt, x, y, true, reduce ? 0 : Math.sin(t * 3 + c.ph) * 1.4, !right);
+        break;
       case 'jellyPink': ctx.drawImage(jellyPink, x, y + Math.round(Math.sin(t * 1.5 + c.ph) * 3)); break;
       case 'jellyBig': {
         const by = y + Math.round(Math.sin(t * 1.2 + c.ph) * 4);
@@ -466,6 +567,14 @@ export function createScene(canvas, { onFrame } = {}) {
       case 'reefBlue': ctx.drawImage(right ? reefBlue : reefBlueL, x, y); break;
       case 'reefYellow': ctx.drawImage(right ? reefYellow : reefYellowL, x, y); break;
       case 'angler': {
+        if (anglerArt) {
+          const wave = reduce ? 0 : Math.sin(t * 5 + c.ph);
+          drawSwim(ctx, anglerArt, x, y, false, wave * 4, right);
+          const lureX = x + (right ? 58 : 7);
+          const glow = reduce ? 0.09 : 0.08 + 0.05 * Math.sin(t * 3 + c.ph);
+          disc(`rgba(182,117,255,${glow.toFixed(3)})`, lureX, y + 14, 10);
+          break;
+        }
         ctx.drawImage(right ? anglerR : anglerL, x, y);
         const lx = right ? x + 18 : x + 1;
         const a = 0.5 + 0.5 * Math.sin(t * 3 + c.ph);
@@ -531,6 +640,14 @@ export function createScene(canvas, { onFrame } = {}) {
     // woda
     for (let y = Math.max(0, surfaceY); y < H; y += 3) fill(css(waterColor((camY + y + 1) / K)), 0, y, W, 3);
 
+    if (cave && shown > 50) {
+      const top = Math.max(0, surfaceY);
+      ctx.save();
+      ctx.globalAlpha = clamp01((shown - 50) / 240) * (shown > 3000 ? 0.36 : 0.5);
+      ctx.drawImage(cave, 0, top, W, H - top);
+      ctx.restore();
+    }
+
     // promienie światła
     for (const r of RAYS) {
       for (let y = Math.max(0, surfaceY); y < H; y += 2) {
@@ -555,10 +672,24 @@ export function createScene(canvas, { onFrame } = {}) {
       }
     }
 
+    // Rozbite pasma światła pod falami podążają za powierzchnią.
+    for (let i = 0; i < 20; i += 1) {
+      const y = surfaceY + 8 + (i * 17) % 76;
+      if (y < 0 || y >= H) continue;
+      const start = ((i * 89 + Math.round(t * 12)) % 73) - 73;
+      const alpha = (0.048 * (1 - (y - surfaceY) / 85)).toFixed(3);
+      for (let x = start; x < W; x += 73) {
+        const length = 8 + (i * 13) % 19;
+        fill(`rgba(178,232,255,${alpha})`, x, y, length, 1);
+        fill(`rgba(178,232,255,${alpha})`, x + length - 1, y + 1, 4, 1);
+      }
+    }
+
     // zawartość kawałków świata widocznych na ekranie
     const ciMin = Math.max(0, Math.floor(camY / CH) - 1);
     const ciMax = Math.floor((camY + H) / CH) + 1;
     for (let ci = ciMin; ci <= ciMax; ci++) {
+      drawSeascape(ci, t, camY, surfaceY);
       const ch = getChunk(ci);
       for (const g of ch.glow) {
         const y = g.wy - camY;
@@ -578,8 +709,13 @@ export function createScene(canvas, { onFrame } = {}) {
     disc('rgba(255,92,122,0.08)', kx + 7, ky + 5, 13);
     disc('rgba(255,92,122,0.12)', kx + 7, ky + 5, 8);
     // nóżki i ogon: szybciej przy zjeździe
-    const flap = Math.floor(t * (5 + f * 9)) % 2;
-    ctx.drawImage(flap ? krillB : krillA, kx, ky);
+    const flap = reduce ? 0 : Math.floor(t * (8 + f * 12)) % krillFrames.length;
+    if (krillArt) {
+      const bend = reduce ? 0 : [0, -1, 0, 1][flap];
+      drawSwim(ctx, krillArt, kx - 5, ky - 5, true, bend);
+    } else {
+      ctx.drawImage(krillFrames[flap], kx, ky);
+    }
 
     // pierścienie sonaru (brak echa)
     for (let i = pings.length - 1; i >= 0; i--) {
@@ -662,8 +798,28 @@ export function createScene(canvas, { onFrame } = {}) {
     // kuter i linia wody
     if (surfaceY > -30 && surfaceY < H + 30) {
       const bob = Math.round(Math.sin(t * 1.1) * 1);
-      ctx.drawImage(boat, Math.round(kx - 22 + 4), surfaceY - 20 + bob);
-      if (!reduce) {
+      if (trawler) {
+        const boatX = kx - 30;
+        const boatY = surfaceY - 37 + bob;
+        const draft = surfaceY - boatY;
+        ctx.drawImage(trawler, 0, 0, trawler.width, draft, boatX, boatY, trawler.width, draft);
+        ctx.save();
+        ctx.globalAlpha = 0.32;
+        const submerged = trawler.height - draft;
+        ctx.drawImage(trawler, 0, draft, trawler.width, submerged, boatX, surfaceY, trawler.width, submerged);
+        ctx.restore();
+        const mastX = boatX + 34;
+        const flagY = boatY - 4;
+        fill('#263c54', mastX, flagY, 1, 12);
+        for (let i = 1; i <= 10; i += 1) {
+          const flutter = reduce ? 0 : Math.round(Math.sin(t * 5 - i * 0.5));
+          fill('#fff9fc', mastX + i, flagY + flutter, 1, 3);
+          fill('#dc2041', mastX + i, flagY + 3 + flutter, 1, 3);
+        }
+      } else {
+        ctx.drawImage(boat, Math.round(kx - 22 + 4), surfaceY - 20 + bob);
+      }
+      if (!kelp && !reduce) {
         // pływające kępy sargassum z zwisającymi pędami
         for (let c = 0; c < 5; c++) {
           const cx = Math.round((((c * 211 + 80 + t * 1.2) % (W + 60)) + W + 60) % (W + 60) - 30);
@@ -677,10 +833,16 @@ export function createScene(canvas, { onFrame } = {}) {
           }
         }
       }
-      for (let x = 0; x < W; x++) {
-        const yy = surfaceY + Math.round(Math.sin(x * 0.22 + t * 1.4));
-        fill('#bfeef0', x, yy, 1, 1);
-        if (x % 2 === 0) fill('rgba(95,182,211,0.5)', x, yy + 1, 1, 1);
+      const flow = reduce ? 0 : t;
+      for (let x = 0; x < W; x += 1) {
+        const swell = Math.sin(x * 0.105 + flow * 1.5);
+        const ripple = Math.sin(x * 0.28 - flow * 2.1);
+        const lift = Math.round(swell + ripple * 0.6);
+        // Podstawowa linia i krótkie refleksy korzystają z błękitu płytkiej wody.
+        fill('#397faa', x, surfaceY + lift, 1, 2);
+        if (swell + ripple > 0.58) {
+          fill(ripple > 0.7 ? '#a0cce4' : '#6aafd3', x, surfaceY + lift - 1, 1, 1);
+        }
       }
     }
   }

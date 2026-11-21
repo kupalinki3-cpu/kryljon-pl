@@ -1,0 +1,41 @@
+import { cat, group } from './util.js';
+
+export default [
+  cat(
+    'polskie_auta',
+    'Polska marka, producent lub model samochodu (także dostawczego, ciężarowego lub autobusu)',
+    group(150, ['FSO', 'Fabryka Samochodów Osobowych'], ['Polonez', 'FSO Polonez'],
+      ['Syrena', 'FSO Syrena', 'FSM Syrena'], ['Warszawa', 'FSO Warszawa'],
+      ['Fiat 126p', 'Polski Fiat 126p', 'Maluch'], ['Fiat 125p', 'Polski Fiat 125p', 'Duży Fiat', 'FSO 1500'],
+      ['Żuk', 'FSC Żuk'], ['Nysa', 'ZSD Nysa'], ['Jelcz', 'Jelczańskie Zakłady Samochodowe', 'JZS'],
+      ['Star', 'FSC Star'], ['Solaris', 'Solaris Bus & Coach']),
+    group(450, ['FSM', 'Fabryka Samochodów Małolitrażowych'], ['Tarpan', 'FSR Tarpan'],
+      ['Honker', 'Tarpan Honker'], 'Autosan', ['Mikrus', 'Mikrus MR-300', 'Mikrus MR300'],
+      ['Arrinera', 'Arrinera Hussarya', 'Hussarya'], 'Melex', 'Lublin'),
+    group(1200, ['CWS', 'Centralne Warsztaty Samochodowe', 'CWS T-1', 'CWS T1'],
+      ['PZInż', 'Państwowe Zakłady Inżynierii'], 'Leopard 6 Litre Roadster',
+      ['AMZ-Kutno', 'AMZ Kutno'], ['Smyk', 'Smyk B30']),
+  ),
+  cat(
+    'polskie_tance',
+    'Polski taniec narodowy lub ludowy',
+    group(150, 'Polonez', 'Krakowiak', 'Mazur', 'Oberek', 'Kujawiak'),
+    group(480, 'Trojak', 'Zbójnicki', 'Lasowiak', 'Wiwat', 'Polka wekslowana',
+      ['Szotmadziar', 'Szot madziar'], 'Sarocz', 'Czardasz śląski', 'Chodzony'),
+  ),
+  cat(
+    'polskie_planszowki',
+    'Gra planszowa lub karciana zaprojektowana w Polsce',
+    group(180, 'Kolejka', ['Neuroshima HEX!', 'Neuroshima Hex 3.0', 'Neuroshima'],
+      ['Robinson Crusoe: Przygoda na przeklętej wyspie', 'Robinson Crusoe'],
+      ['Wiedźmin: Stary Świat', 'Wiedźmin Stary Świat'],
+      ['Osadnicy: Narodziny Imperium', 'Osadnicy'], ['Detektyw: Kryminalna gra planszowa', 'Detektyw'],
+      ['This War of Mine: Gra planszowa', 'This War of Mine'], 'Drako'),
+    group(520, 'Stronghold', 'Bohema', 'Nowa Era', '51. Stan', 'Pret-a-Porter',
+      'Zombiaki', 'Eleven: Football Manager Board Game', 'Stworze', 'Kroniki Zamku Avel',
+      ['Magnum Sal', 'Magnum Sal: Muria'],
+      'Mali Powstańcy', 'M/S Batory'),
+    group(1300, ['303: Bitwa o Wielką Brytanię', '303'], ['111: Alarm dla Warszawy', '111', 'Alarm dla Warszawy'],
+      ['7: W obronie Lwowa', 'W obronie Lwowa'], 'ZnajZnak', 'Reglamentacja: Gra na kartki', 'Pan tu nie stał!'),
+  ),
+];
