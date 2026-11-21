@@ -212,19 +212,6 @@ const whaleR = (() => {
   });
 })();
 const whaleL = flipped(whaleR);
-const squid = rowsSprite({ s: 'rgba(214,72,108,0.88)', d: 'rgba(150,40,76,0.9)', e: '#ffe9a8', t: 'rgba(214,72,108,0.7)' }, [
-  '....ss....',
-  '...ssss...',
-  '..ssdsss..',
-  '..sssdss..',
-  '.sssssss..',
-  '.ssessess.',
-  '..sssss...',
-  '..t.t.t...',
-  '..t.t.t.t.',
-  '..t...t.t.',
-  '.t.....t..',
-]);
 const wreck = (() => {
   const H = '#0b1521'; const M = '#122234'; const G = 'rgba(60,150,110,0.7)'; const W = '#ffcf6a';
   return sprite(58, 34, (R) => {
@@ -334,7 +321,7 @@ function makeChunk(ci) {
     } else if (m < 3600) {
       const rr = rand();
       if (rr < 0.1) creatures.push({ kind: 'whale', wy, fx: rand(), sp: (2 + rand() * 1.5) * d, ph: rand() * 6 });
-      else if (rr < 0.22) creatures.push({ kind: 'squid', wy, fx: rand(), sp: 3 * d, ph: rand() * 6 });
+      else if (rr < 0.22) creatures.push({ kind: 'jellyCyan', wy, fx: rand(), sp: 3 * d, ph: rand() * 6 });
       else creatures.push(rand() < 0.3
         ? { kind: 'jellyCyan', wy, fx: rand(), sp: 2 * d, ph: rand() * 6 }
         : { kind: 'fishM', wy, fx: rand(), sp: (4 + rand() * 5) * d, ph: rand() * 6 });
@@ -539,12 +526,6 @@ export function createScene(canvas, { onFrame } = {}) {
         }
         const flapPhase = Math.floor(t * 2.2 + c.ph) % 2;
         ctx.drawImage(right ? (flapPhase ? mantaB : mantaA) : (flapPhase ? mantaBL : mantaAL), x, y);
-        break;
-      }
-      case 'squid': {
-        const pulse = Math.round(Math.sin(t * 2 + c.ph) * 3);
-        ctx.drawImage(squid, x, y + pulse);
-        disc('rgba(255,233,168,0.06)', x + 5, y + 6 + pulse, 8);
         break;
       }
       case 'wreck': {
