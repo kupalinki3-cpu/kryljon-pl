@@ -163,3 +163,19 @@ test('cleanName', () => {
   assert.equal(cleanName('Ala\u0000​Ma'), 'Ala Ma');
   assert.equal(cleanName(42), null);
 });
+
+test('rzadkość dynamiczna: popularne płytsze, niepopularne głębsze, "Każdy zna" nie głębieje, mała próba prawie nic nie zmienia', async () => {
+  const { adjustMeters } = await import('../src/game.js');
+  // pełna próba (total >= 100)
+  assert.equal(adjustMeters(1000, 50, 50, 500), 500); // najczęstsza: -50%
+  assert.equal(adjustMeters(1000, 0, 50, 500), 1250); // nikt nie podaje: +25%
+  assert.ok(adjustMeters(1000, 25, 50, 500) < 1000 && adjustMeters(1000, 25, 50, 500) > 500);
+  assert.equal(adjustMeters(150, 0, 50, 500), 150); // poniżej 200 m nie robi się głębiej
+  assert.equal(adjustMeters(150, 50, 50, 500), 80); // ale może być płycej
+  // brak danych: bez zmian
+  assert.equal(adjustMeters(1000, 0, 0, 0), 1000);
+  // mała próba: korekta proporcjonalnie słabsza
+  assert.ok(Math.abs(adjustMeters(1000, 5, 5, 10) - 1000) <= 60);
+  // zawsze co najmniej 10 m
+  assert.ok(adjustMeters(10, 50, 50, 500) >= 10);
+});

@@ -12,11 +12,13 @@ import uzupPrzyroda from './uzup-przyroda.js';
 import uzupKultura from './uzup-kultura.js';
 import uzupLudzie from './uzup-ludzie.js';
 import uzupReszta from './uzup-reszta.js';
+import uzupNet from './uzup-net.js';
+import uzupMasa from './uzup-masa.js';
 import { normalize } from '../game.js';
 
 // Id kategorii nigdy nie usuwamy ani nie zmieniamy: zapisane dni w bazie wskazują na nie po id.
 const uzupelnienia = {};
-for (const part of [uzupelnieniaPodstawowe, uzupPrzyroda, uzupKultura, uzupLudzie, uzupReszta]) {
+for (const part of [uzupelnieniaPodstawowe, uzupPrzyroda, uzupKultura, uzupLudzie, uzupReszta, uzupNet, uzupMasa]) {
   for (const [id, list] of Object.entries(part)) uzupelnienia[id] = [...(uzupelnienia[id] ?? []), ...list];
 }
 
@@ -58,4 +60,26 @@ function withExtras(prompt) {
   return { ...prompt, answers };
 }
 
-export const PROMPTS = BASE.map(withExtras);
+// W kategoriach z osobami samo nazwisko (ostatni człon) też jest odpowiedzią, o ile nie koliduje z niczym w kategorii
+// i jest jednoznaczne wśród osób. Nic nie zmienia się w głębokościach.
+const PERSON_CATEGORIES = new Set([
+  'naukowiec', 'pisarz', 'aktor', 'piosenkarz', 'prezenter', 'postac_historyczna', 'sportowiec', 'tworca', 'raper',
+]);
+
+function withSurnames(prompt) {
+  if (!PERSON_CATEGORIES.has(prompt.id)) return prompt;
+  const taken = new Set();
+  prompt.answers.forEach((e) => e.slice(1).forEach((n) => taken.add(normalize(n))));
+  const owners = new Map();
+  prompt.answers.forEach((e, i) => {
+    const words = normalize(e[1]).split(' ');
+    const last = words[words.length - 1];
+    if (words.length < 2 || last.length < 4 || taken.has(last)) return;
+    owners.set(last, owners.has(last) ? -1 : i);
+  });
+  const answers = prompt.answers.map((e) => [...e]);
+  for (const [name, i] of owners) if (i >= 0) answers[i].push(name);
+  return { ...prompt, answers };
+}
+
+export const PROMPTS = BASE.map(withExtras).map(withSurnames);

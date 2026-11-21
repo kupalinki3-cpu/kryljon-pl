@@ -16,7 +16,7 @@ Stos: Cloudflare Worker + D1 + pliki statyczne z `public/`. Bez zależności w r
 ## Uruchomienie
 
 ```
-npm test                      # 36 testów: silnik, treść, API (oba tryby, brak echa, migracja 0002)
+npm test                      # 37 testów: silnik, rzadkość dynamiczna, treść, API (oba tryby, brak echa, migracja 0002)
 npm start                     # gra lokalnie na http://localhost:8787, bez Cloudflare
 npx wrangler d1 create glebia # wpisz zwrócone database_id do wrangler.toml
 npm run db:migrate:local      # migracje lokalnie
@@ -47,6 +47,13 @@ Baza jest punktem startowym i rośnie razem z graczami: nie zna wszystkiego, co 
 - `src/game.js` – czysta logika (normalizacja, dopasowanie, daty, losowanie)
 - `src/index.js` – API Workera
 - `src/content/` – 48 kategorii, ok. 2970 wpisów (nauka, przyroda, geografia, miejsca, kultura, ludzie, sport i szkoła, internet)
-- `migrations/` – `0001_init.sql` (schemat D1), `0002_modes_meters.sql` (tryby, metry, tabela `misses`)
+- `migrations/` – `0001_init.sql` (schemat D1), `0002_modes_meters.sql` (tryby, metry, tabela `misses`), `0003_popularity_index.sql` (indeks pod rzadkość dynamiczną)
 - `public/` – front: `scene.js` (pikselartowe morze na canvasie), `app.js` (logika), `style.css`, `index.html`. Czcionka Pixelify Sans ładuje się z Google Fonts, bez sieci wchodzi monospace
 - `test/` – testy (`d1shim.js` emuluje D1 na `node:sqlite`)
+
+## Rzadkość dynamiczna
+
+Głębokość odpowiedzi to wartość z bazy skorygowana o to, jak często gracze podają daną odpowiedź w kategorii
+(`adjustMeters` w `src/game.js`): najczęstsza jest do 50% płytsza, odpowiedź, której nikt nie podaje, do 25% głębsza,
+a wpisy poniżej 200 m („Każdy zna”) nigdy nie robią się głębsze. Korekta rośnie liniowo do 100 odpowiedzi w kategorii.
+Współczynniki są redakcyjne i niekalibrowane na prawdziwym ruchu. Po zmianie migracji uruchom `npm run db:migrate:remote`.

@@ -1,0 +1,52 @@
+// Uzupełnienia: polski internet, memy, stereotypy, twórcy, napoje. Tylko nazwy znane z polskiej kultury internetu.
+import { group } from './util.js';
+
+export default {
+  tworca: [
+    ['Paweł Jumper', 'Paweł Dżaper', 'Dżaper', 'Paweł Dżamper', 'Dżamper', 'Jamper', 'Paweł Jamper', 'Jumper'],
+    ...group(180, ['Rezi', 'Rezi.tv'], ),
+    ...group(450, 'Daniel Magical', 'Magical', 'Kacper Błoński', 'Kacper Blonski', 'Lukasz Jakobiak', 'Łukasz Jakóbiak', 'Jakobiak',
+      'Papaj', 'Jakub Mróz'),
+    ['Kamila Labudda', 'Kamil Labudda', 'Labudda'],
+    ['Marcin Dubiel', 'Dubiel'], ['Major Suchodolski', 'Suchodolski', 'Major'], ['Wardęga', 'Sylwester Wardęga', 'Sylwester Wardega', 'Wardega'],
+    ['Lord Kruszwil', 'Kruszwil'], ['Kuba Klawiter', 'Klawiter'], ['Budda', 'Budda Youtuber'], ['Friz', 'Friz Youtuber'], ['Maffashion', 'Julia Mafaszion'],
+    ['Blowek', 'Błowek'], ['Wojtek Gola', 'Gola'], ['Rafonix', 'Rafał Rafonix'], ['Anelka'], ['Dobrodziej'], ['Gimper', 'Gimper'],
+    ['Izak', 'Izak Youtuber'], ['Mixer', 'Mixer Streamer'], ['Ewron'],
+  ],
+  mem: [
+    ...group(130, ['Janusz', 'Janusz biznesu', 'Pan Janusz'], ['Karyna', 'Karen'], ['Seba', 'Sebix', 'Sebastian'], ['Grażyna', 'Pani Grażyna']),
+    ...group(170, ['Polak Cebulak', 'cebulak', 'cebula'], ['Typowy Polak', 'typowy Polak'], ['Madka', 'madki', 'Madka Polka'], ['Dzban'], ['Dresiarz', 'dres'], ['Wujek dobra rada', 'wujek']),
+    ...group(250, ['Ciocia dobra rada', 'ciocia'], ['Polak potrafi', 'Polacy potrafią'], ['Janusz Biznesu', 'januszex'], ['Januszex', 'Janusz biznesu'], ['Patologia', 'patola', 'patus', 'patusy'], ['Pan Mietek', 'Mietek'], ),
+    ...group(450, ['Baba z okienka', 'Pani w okienku'], ['Proszę pana', 'No proszę pana'], ['Niedzielny kierowca', 'niedzielny'], ['Pan Heniek', 'Heniek'], ['Kolega Zdzisia', 'Zdzisio'], ['Mirek', 'Pan Mirek'],
+      ['Dżesika', 'Jessica'], ['Brajan', 'Brajanek'], ),
+    ...group(800, ['Gimbus', 'Gimbaza', 'gimbaza'], ['Cebula', 'Cebula Polak'], ['Pani Krysia', 'Krysia'], ['Studenciak', 'student'], ),
+  ],
+  stereotyp: [
+    ...group(110, ['Janusz', 'Janusz biznesu', 'Pan Janusz'], ['Grażyna', 'Pani Grażyna'], ['Karyna', 'Karen'], ['Polak pijak', 'pijak', 'Polak alkoholik', 'Polak lubi wypić', 'Polacy piją']),
+    ...group(130, ['Polak cebulak', 'cebulak', 'Cebula', 'Cebulactwo'], ['Polak narzekacz', 'narzekanie', 'Polak marudzi', 'Polacy narzekają', 'Polak malkontent', 'malkontent'],
+      ['Polak katolik', 'Polak religijny', 'Polak chodzi do kościoła'], ['Polak złodziej', 'Polak kradnie', 'Polacy kradną', 'Polak kradzież'], ['Polak kombinator', 'kombinator', 'Polak kombinuje'],
+      ['Polak potrafi', 'Polacy potrafią'], ['Polak w Anglii', 'Polak w UK', 'Polak na emigracji'], ['Polak za granicą', 'Polak za granicą'], ['Polak za kierownicą', 'Polak kierowca'], ['Polak spod sklepu', 'spod sklepu', 'Typ spod sklepu']),
+    ...group(160, ['Seba', 'Sebix', 'Sebastian', 'Sebek'], ['Dresiarz', 'dres', 'dresiarze', 'Dres'], ['Kibol', 'kibice', 'pseudokibic'], ['Wąsacz', 'wąsaty', 'Pan z wąsem'], ['Babcia', 'Babcia z kościoła', 'Moherowy beret', 'moher'],
+      ['Dziadek', 'Dziadek z wąsem'], ['Sąsiad', 'Sąsiad Janusz'], ['Sąsiadka', 'Sąsiadka Grażyna'], ['Pani Krysia', 'Krysia'], ['Pan Mirek', 'Mirek'], ['Pani Halinka', 'Halinka'], ['Pan Zdzisio', 'Zdzisio', 'Zdzisiu'],
+      ['Prezes', 'Prezes firmy'], ['Pan Sebastian', 'Sebastian']),
+    ...group(250, ['Brajan', 'Brajanek'], ['Dżesika', 'Jessica', 'Dżesika'], ['Madka', 'madki', 'Madka Polka'], ['Wujek dobra rada', 'wujek', 'Wujek Dobra Rada'], ['Ciocia dobra rada', 'ciocia', 'Ciocia Dobra Rada'],
+      ['Typowy Polak', 'typowy Polak'], ['Wujek z wesela', 'Wujek z wesela'], ['Pan z kiosku', 'Kioskarz'], ['Chłop ze wsi', 'wieśniak', 'Wieśniak', 'Ciemny lud'], ['Polak na budowie', 'Budowlaniec', 'Polak budowlaniec']),
+    ...group(450, ['Pani z urzędu', 'Urzędniczka', 'urzędnik'], ['Pani w okienku', 'Pani z okienka', 'Pani z poczty'], ['Student', 'Studenciak'], ['Kierowca BMW', 'BMW', 'Typ w BMW', 'Bmw'],
+      ['Kierowca Passata', 'Passat', 'Typ w Passacie', 'Pan w Passacie'], ['Taksówkarz', 'Taksiarz'], ['Kierowca TIR-a', 'Tirowiec', 'Kierowca tira'], ['Szwagier', 'Szwagier z Anglii'], ['Teściowa', 'Teściowa mem'],
+      ['Pani z Biedronki', 'Kasjerka', 'Kasjerka z Biedronki'], ['Mamusia', 'Maminsynek', 'Maminsynek'], ['Parafianin', 'Parafianka']),
+    ...group(700, ['Hipster', 'hipsterzy'], ['Gimbus', 'Gimbaza'], ['Typ spod sklepu', 'Typ spod sklepu'], ['Influencerka', 'Instagramerka', 'Instamatka'], ['Wegan', 'Weganin', 'Weganka'],
+      ['Rowerzysta', 'Typowy rowerzysta'], ['Warszawiak', 'Cwaniak z Warszawy', 'Warszawka'], ['Krakus', 'Krakowiak'], ['Góral', 'Górale', 'Góral z Zakopanego'], ['Ślązak', 'Ślonzok', 'Hanys'], ['Poznaniak', 'Pyra', 'Pyra z Poznania'],
+      ['Lubelak', 'Lublinianin']),
+  ],
+  napoj: [
+    ...group(110, ['wódka', 'Wódka', 'wóda', 'Wóda', 'wódeczka', 'Wódeczka', 'wódzia', 'Wódzia'], ['piwo', 'Piwo', 'piwko', 'Piwko', 'browar', 'Browar'], ['woda', 'Woda', 'woda mineralna'],
+      ['kompot', 'Kompot'], ['herbata', 'Herbata'], ['kawa', 'Kawa'], ['sok', 'Sok', 'soczek'], ['mleko', 'Mleko'], ['cola', 'Coca-Cola', 'Coca Cola', 'Pepsi', 'Cola']),
+    ...group(250, ['oranżada', 'Oranżada', 'oranżadka'], ['kwas chlebowy', 'Kwas chlebowy', 'kwas'], ['kefir', 'Kefir'], ['maślanka', 'Maślanka'], ['sok jabłkowy', 'Sok jabłkowy'], ['woda gazowana', 'woda niegazowana'],
+      ['piwo bezalkoholowe', 'Piwo bezalkoholowe'], ['szampan', 'Szampan'], ['wino', 'Wino', 'winko', 'Winko', 'wino owocowe', 'Wino owocowe'], ['likier', 'Likier'], ['nalewka', 'Nalewka', 'nalewka domowa'],
+      ['samogon', 'Samogon', 'bimber', 'Bimber', 'księżycówka'], ['spirytus', 'Spirytus', 'Spirytus Rektyfikowany'], ['Lemoniada', 'lemoniada'], ['kakao', 'Kakao'], ['Pepsi', 'Pepsi']),
+    ...group(450, ['Mocny Full', 'Mocny Full'], ['Harnaś', 'Harnaś'], ['Dębowe Mocne', 'Dębowe'], ['Tyskie', 'Tyskie'], ['Lech Premium', 'Lech'], ['Warka', 'Warka Strong'], ['EB', 'Specjal'], ['Żywiec', 'Żywiec Porter'], ['Miodula', 'Miodula'], ['Piwo Okocim', 'Okocim'], ['Piwo Tatra', 'Tatra'], ['Kustosz', 'Kustosz'], ['Królewskie', 'Królewskie'], ['Zubr', 'Żubr'], ['Książęce', 'Książęce'], ['Łomża', 'Łomża'], ['Perła', 'Perła'], ['Fanta', 'Fanta'], ['Sprite', 'Sprite'],
+      ['7up', '7 Up', '7up'], ['Mirinda', 'Mirinda'], ['Kropla Beskidu', 'Kropla Beskidu'], ['Soplica', 'Soplica'], ['Żołądkowa Gorzka', 'Żołądkowa Gorzka'], ['Śliwowica', 'Śliwowica'],
+      ['Napój energetyczny', 'Red Bull', 'Redbull', 'Monster', 'Tiger', 'Burn']),
+    ...group(900, ['Miód pitny', 'miód', 'Półtorak', 'Dwójniak', 'Trójniak', 'Czwórniak'], ['Cydr', 'Cydr Lubelski', 'Cydr Lubelski'], ['Sok z kiszonej kapusty', 'sok z kiszonki'], ['Śliwowica Łącka', 'Śliwowica Łącka']),
+  ],
+};

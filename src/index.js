@@ -10,6 +10,7 @@ import {
   isValidDay,
   PROMPTS_PER_DAY,
   matchAnswer,
+  adjustMeters,
   msUntilNextDay,
   normalize,
   pointsOf,
@@ -142,6 +143,33 @@ async function crowdShare(env, day, promptId, key) {
   const total = row.total + 1; // + bieżąca odpowiedź
   if (total < 5) return null; // za mało graczy, procent byłby bez sensu
   return { percent: Math.round(((row.same + 1) / total) * 100), total };
+}
+
+const popCache = new WeakMap(); // env.DB -> Map(prompt_id -> { at, counts, max, total })
+const POP_TTL_MS = 30_000;
+
+/** Liczniki odpowiedzi w kategorii (wszystkie dni i tryby), cache 30 s na instancję. */
+async function popularity(env, promptId, now) {
+  let byPrompt = popCache.get(env.DB);
+  if (!byPrompt) popCache.set(env.DB, (byPrompt = new Map()));
+  const hit = byPrompt.get(promptId);
+  if (hit && now - hit.at < POP_TTL_MS) return hit;
+  const { results } = await env.DB.prepare(
+    "SELECT key, COUNT(*) AS n FROM answers WHERE prompt_id = ? AND key IS NOT NULL AND norm != '' GROUP BY key",
+  )
+    .bind(promptId)
+    .all();
+  const counts = new Map();
+  let max = 0;
+  let total = 0;
+  for (const r of results ?? []) {
+    counts.set(r.key, r.n);
+    total += r.n;
+    if (r.n > max) max = r.n;
+  }
+  const fresh = { at: now, counts, max, total };
+  byPrompt.set(promptId, fresh);
+  return fresh;
 }
 
 /** Zapisuje odpowiedź i przesuwa bieg do przodu w jednej transakcji. */
@@ -305,7 +333,8 @@ async function handleAnswer(request, env, now) {
     return json({ noEcho: true, raw, tries: prev.n + 1, maxTries: MAX_MISSES });
   }
 
-  const meters = match.meters;
+  const pop = await popularity(env, prompt.id, now);
+  const meters = adjustMeters(match.meters, pop.counts.get(match.shown) ?? 0, pop.max, pop.total);
   const ms = Math.min(LIMIT_MS, Math.max(MIN_ANSWER_MS, now - run.started_at));
   const share = await crowdShare(env, run.day, prompt.id, match.shown);
   try {

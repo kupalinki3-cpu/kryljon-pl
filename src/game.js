@@ -24,6 +24,27 @@ export function depthBand(meters) {
   return BANDS.find((b) => meters < b.max);
 }
 
+// Dynamiczna rzadkość: im częściej gracze podają odpowiedź, tym jest płycej; rzadko wybierane stają się głębsze.
+// Progi i współczynniki są redakcyjne i niekalibrowane na prawdziwym ruchu.
+export const POP_MIN_TOTAL = 100; // przy tylu odpowiedziach w kategorii korekta działa w pełni (wcześniej proporcjonalnie)
+export const POP_RARER_MAX = 1.25; // odpowiedź, której nikt nie podaje: do +25% głębokości
+export const POP_COMMON_MIN = 0.5; // najpopularniejsza odpowiedź: do -50% głębokości
+export const POP_EXEMPT_BELOW = 200; // "Każdy zna" nigdy nie robi się głębsze
+
+/**
+ * Głębokość po korekcie o popularność. count: ile razy podano tę odpowiedź, maxCount: ile razy
+ * podano najczęstszą w kategorii, total: wszystkie odpowiedzi w kategorii.
+ */
+export function adjustMeters(base, count, maxCount, total) {
+  if (!(base > 0) || !(maxCount > 0) || !(total > 0)) return base;
+  const p = Math.min(1, Math.max(0, count / maxCount));
+  let f = POP_RARER_MAX - (POP_RARER_MAX - POP_COMMON_MIN) * p;
+  if (base < POP_EXEMPT_BELOW) f = Math.min(1, f);
+  const w = Math.min(1, total / POP_MIN_TOTAL);
+  const out = Math.round((base * (1 + (f - 1) * w)) / 10) * 10;
+  return Math.max(10, out);
+}
+
 /** Wynik punktowy to głębokość podzielona przez 10 (jak w oryginale: 10 m za punkt). */
 export const pointsOf = (meters) => Math.round(meters / 10);
 
