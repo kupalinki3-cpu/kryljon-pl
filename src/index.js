@@ -4,14 +4,15 @@ import {
   INTRO_MS,
   LIMIT_MS,
   MAX_ANSWER_LEN,
-  METERS_PER_POINT,
   MIN_ANSWER_MS,
-  TIERS,
+  depthBand,
   cleanName,
   isValidDay,
+  PROMPTS_PER_DAY,
   matchAnswer,
   msUntilNextDay,
   normalize,
+  pointsOf,
   pickPromptIds,
   prevDay,
   warsawDay,
@@ -60,22 +61,46 @@ async function playerHash(token) {
 
 // ---------- dostęp do danych ----------
 
-async function dayPrompts(env, day) {
-  const ids = pickPromptIds(day, PROMPTS.map((p) => p.id));
-  await env.DB.prepare('INSERT OR IGNORE INTO days (day, prompts) VALUES (?, ?)').bind(day, JSON.stringify(ids)).run();
-  const row = await env.DB.prepare('SELECT prompts FROM days WHERE day = ?').bind(day).first();
-  // Id kategorii nigdy nie usuwamy z treści, inaczej stary dzień by się rozjechał.
-  return JSON.parse(row.prompts).map((id) => PROMPT_BY_ID.get(id));
+const ALL_IDS = PROMPTS.map((p) => p.id);
+const MAX_MISSES = 40; // prób "bez echa" na jedno pytanie
+const MODES = new Set(['daily', 'free']);
+
+/** Zamienia zapisane id na kategorie; usunięte kiedyś id zastępuje innymi, żeby stary dzień się nie wywrócił. */
+function resolvePrompts(ids) {
+  const used = new Set(ids.filter((id) => PROMPT_BY_ID.has(id)));
+  const spare = ALL_IDS.filter((id) => !used.has(id));
+  return ids.map((id) => PROMPT_BY_ID.get(id) ?? PROMPT_BY_ID.get(spare.shift()));
 }
 
+async function dayPrompts(env, day) {
+  const ids = pickPromptIds(day, ALL_IDS);
+  await env.DB.prepare('INSERT OR IGNORE INTO days (day, prompts) VALUES (?, ?)').bind(day, JSON.stringify(ids)).run();
+  const row = await env.DB.prepare('SELECT prompts FROM days WHERE day = ?').bind(day).first();
+  return resolvePrompts(JSON.parse(row.prompts));
+}
+
+function randomIds(n = PROMPTS_PER_DAY) {
+  const pool = [...ALL_IDS];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, n);
+}
+
+const promptsOf = (env, run) => (run.prompts ? Promise.resolve(resolvePrompts(JSON.parse(run.prompts))) : dayPrompts(env, run.day));
+
 const getRun = (env, day, player) =>
-  env.DB.prepare('SELECT * FROM runs WHERE day = ? AND player = ?').bind(day, player).first();
+  env.DB.prepare("SELECT * FROM runs WHERE day = ? AND player = ? AND mode = 'daily'").bind(day, player).first();
+
+const getFreeRun = (env, player) =>
+  env.DB.prepare("SELECT * FROM runs WHERE player = ? AND mode = 'free' ORDER BY id DESC LIMIT 1").bind(player).first();
 
 const getRunById = (env, id) => env.DB.prepare('SELECT * FROM runs WHERE id = ?').bind(id).first();
 
 async function history(env, runId) {
   const { results } = await env.DB.prepare(
-    'SELECT idx, prompt_id, raw, key, tier, points, ms FROM answers WHERE run_id = ? ORDER BY idx',
+    'SELECT idx, prompt_id, raw, key, tier, meters, ms FROM answers WHERE run_id = ? ORDER BY idx',
   )
     .bind(runId)
     .all();
@@ -85,8 +110,9 @@ async function history(env, runId) {
     raw: r.raw,
     shown: r.key,
     tier: r.tier,
-    label: TIERS[r.tier].name,
-    points: r.points,
+    label: depthBand(r.meters).name,
+    meters: r.meters,
+    points: pointsOf(r.meters),
     ms: r.ms,
   }));
 }
@@ -94,11 +120,12 @@ async function history(env, runId) {
 async function rankOf(env, run) {
   const row = await env.DB.prepare(
     `SELECT COUNT(*) + 1 AS rank FROM runs
-     WHERE day = ? AND finished = 1 AND (points > ? OR (points = ? AND total_ms < ?) OR (points = ? AND total_ms = ? AND id < ?))`,
+     WHERE day = ? AND mode = 'daily' AND finished = 1
+       AND (meters > ? OR (meters = ? AND total_ms < ?) OR (meters = ? AND total_ms = ? AND id < ?))`,
   )
-    .bind(run.day, run.points, run.points, run.total_ms, run.points, run.total_ms, run.id)
+    .bind(run.day, run.meters, run.meters, run.total_ms, run.meters, run.total_ms, run.id)
     .first();
-  const players = await env.DB.prepare('SELECT COUNT(*) AS n FROM runs WHERE day = ? AND finished = 1')
+  const players = await env.DB.prepare("SELECT COUNT(*) AS n FROM runs WHERE day = ? AND mode = 'daily' AND finished = 1")
     .bind(run.day)
     .first();
   return { rank: row.rank, players: players.n };
@@ -118,19 +145,19 @@ async function crowdShare(env, day, promptId, key) {
 }
 
 /** Zapisuje odpowiedź i przesuwa bieg do przodu w jednej transakcji. */
-async function commitAnswer(env, run, prompts, { raw, norm, key, tier, ms }) {
-  const points = TIERS[tier].points;
+async function commitAnswer(env, run, prompts, { raw, norm, key, meters, ms }) {
+  const tier = depthBand(meters).tier;
   const nextIdx = run.idx + 1;
   const finished = nextIdx >= prompts.length ? 1 : 0;
   await env.DB.batch([
     env.DB.prepare(
-      `INSERT INTO answers (run_id, idx, day, prompt_id, raw, norm, key, tier, points, ms)
+      `INSERT INTO answers (run_id, idx, day, prompt_id, raw, norm, key, tier, meters, ms)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(run.id, run.idx, run.day, prompts[run.idx].id, raw, norm, key, tier, points, ms),
+    ).bind(run.id, run.idx, run.day, prompts[run.idx].id, raw, norm, key, tier, meters, ms),
     env.DB.prepare(
-      `UPDATE runs SET idx = ?, started_at = NULL, points = points + ?, total_ms = total_ms + ?, finished = ?
+      `UPDATE runs SET idx = ?, started_at = NULL, meters = meters + ?, total_ms = total_ms + ?, finished = ?
        WHERE id = ? AND idx = ?`,
-    ).bind(nextIdx, points, ms, finished, run.id, run.idx),
+    ).bind(nextIdx, meters, ms, finished, run.id, run.idx),
   ]);
 }
 
@@ -139,7 +166,7 @@ async function settleExpired(env, runIn, prompts, now) {
   let run = runIn;
   while (!run.finished && run.started_at != null && now > run.started_at + LIMIT_MS + GRACE_MS) {
     try {
-      await commitAnswer(env, run, prompts, { raw: '', norm: '', key: null, tier: 0, ms: LIMIT_MS });
+      await commitAnswer(env, run, prompts, { raw: '', norm: '', key: null, meters: 0, ms: LIMIT_MS });
     } catch {
       /* równoległe żądanie mogło to już zapisać; przeczytaj stan od nowa */
     }
@@ -150,15 +177,16 @@ async function settleExpired(env, runIn, prompts, now) {
 
 async function runState(env, run, prompts) {
   const state = {
+    mode: run.mode,
     day: run.day,
     total: prompts.length,
     idx: run.idx,
-    points: run.points,
-    depth: run.points * METERS_PER_POINT,
+    depth: run.meters,
+    points: pointsOf(run.meters),
     finished: !!run.finished,
     history: await history(env, run.id),
   };
-  if (run.finished) state.me = await rankOf(env, run);
+  if (run.finished && run.mode === 'daily') state.me = await rankOf(env, run);
   return state;
 }
 
@@ -174,16 +202,46 @@ async function handleToday(env, now) {
   });
 }
 
+const modeOf = (body) => {
+  const mode = body.mode ?? 'daily';
+  if (!MODES.has(mode)) throw new HttpError(400, 'Niepoprawny tryb gry');
+  return mode;
+};
+
 async function handleRun(request, env, now) {
   const body = await readBody(request);
   const player = await playerHash(body.token);
+  const mode = modeOf(body);
+
+  if (mode === 'free') {
+    let run = await getFreeRun(env, player);
+    if (body.resume) {
+      if (!run || run.finished) throw new HttpError(404, 'Brak rozpoczętej gry swobodnej');
+    } else if (body.fresh || !run || run.finished) {
+      const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM runs WHERE player = ? AND mode = 'free' AND created_at > ?")
+        .bind(player, now - 3600_000)
+        .first();
+      if (recent.n >= 60) throw new HttpError(429, 'Za dużo nowych gier w ciągu godziny');
+      const name = cleanName(body.name) ?? 'Gość';
+      const info = await env.DB.prepare(
+        "INSERT INTO runs (day, mode, player, name, prompts, created_at) VALUES ('free', 'free', ?, ?, ?, ?)",
+      )
+        .bind(player, name, JSON.stringify(randomIds()), now)
+        .run();
+      run = await getRunById(env, info.meta.last_row_id);
+    }
+    const prompts = await promptsOf(env, run);
+    run = await settleExpired(env, run, prompts, now);
+    return json(await runState(env, run, prompts));
+  }
+
   const day = warsawDay(now);
   const prompts = await dayPrompts(env, day);
   let run = await getRun(env, day, player);
   if (!run) {
     const name = cleanName(body.name);
     if (!name) throw new HttpError(400, 'Pseudonim musi mieć od 2 do 16 znaków');
-    await env.DB.prepare('INSERT OR IGNORE INTO runs (day, player, name, created_at) VALUES (?, ?, ?, ?)')
+    await env.DB.prepare("INSERT OR IGNORE INTO runs (day, mode, player, name, created_at) VALUES (?, 'daily', ?, ?, ?)")
       .bind(day, player, name, now)
       .run();
     run = await getRun(env, day, player);
@@ -194,10 +252,10 @@ async function handleRun(request, env, now) {
 
 async function loadRun(body, env, now) {
   const player = await playerHash(body.token);
-  const day = warsawDay(now);
-  const prompts = await dayPrompts(env, day);
-  const run = await getRun(env, day, player);
-  if (!run) throw new HttpError(404, 'Najpierw rozpocznij dzisiejsze nurkowanie');
+  const mode = modeOf(body);
+  const run = mode === 'free' ? await getFreeRun(env, player) : await getRun(env, warsawDay(now), player);
+  if (!run) throw new HttpError(404, 'Najpierw rozpocznij nurkowanie');
+  const prompts = await promptsOf(env, run);
   return { run: await settleExpired(env, run, prompts, now), prompts };
 }
 
@@ -217,7 +275,8 @@ async function handlePrompt(request, env, now) {
     text: prompts[run.idx].text,
     startsInMs: Math.max(0, run.started_at - now),
     remainingMs: Math.max(0, run.started_at + LIMIT_MS - now),
-    points: run.points,
+    depth: run.meters,
+    points: pointsOf(run.meters),
   });
 }
 
@@ -231,24 +290,40 @@ async function handleAnswer(request, env, now) {
   const raw = typeof body.answer === 'string' ? body.answer.slice(0, MAX_ANSWER_LEN) : '';
   const prompt = prompts[run.idx];
   const match = matchAnswer(prompt, raw);
-  const tier = match ? match.tier : 0;
-  const key = match ? match.shown : null;
+
+  if (!match) {
+    // Brak echa: odpowiedzi nie ma w bazie. Pytanie trwa dalej, zegar się nie zatrzymuje, gracz próbuje jeszcze raz.
+    const norm = normalize(raw);
+    if (!norm) return json({ noEcho: true, empty: true, tries: 0 });
+    const prev = await env.DB.prepare('SELECT COUNT(*) AS n FROM misses WHERE run_id = ? AND idx = ?')
+      .bind(run.id, run.idx)
+      .first();
+    if (prev.n >= MAX_MISSES) throw new HttpError(429, 'Za dużo prób przy tym pytaniu');
+    await env.DB.prepare('INSERT INTO misses (run_id, idx, prompt_id, raw, norm, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(run.id, run.idx, prompt.id, raw, norm, now)
+      .run();
+    return json({ noEcho: true, raw, tries: prev.n + 1, maxTries: MAX_MISSES });
+  }
+
+  const meters = match.meters;
   const ms = Math.min(LIMIT_MS, Math.max(MIN_ANSWER_MS, now - run.started_at));
-  const share = await crowdShare(env, run.day, prompt.id, key);
+  const share = await crowdShare(env, run.day, prompt.id, match.shown);
   try {
-    await commitAnswer(env, run, prompts, { raw, norm: normalize(raw), key, tier, ms });
+    await commitAnswer(env, run, prompts, { raw, norm: match.norm, key: match.shown, meters, ms });
   } catch {
     const fresh = await getRunById(env, run.id);
     throw new HttpError(409, 'Ta odpowiedź została już zapisana', { state: await runState(env, fresh, prompts) });
   }
   const after = await getRunById(env, run.id);
+  const band = depthBand(meters);
   const result = {
     idx: run.idx,
     raw,
-    shown: key,
-    tier,
-    label: TIERS[tier].name,
-    points: TIERS[tier].points,
+    shown: match.shown,
+    tier: band.tier,
+    label: band.name,
+    meters,
+    points: pointsOf(meters),
     ms,
     share,
   };
@@ -261,12 +336,12 @@ async function handleLeaderboard(request, env, now) {
   const day = url.searchParams.get('day') || today;
   if (!isValidDay(day) || day > today) throw new HttpError(400, 'Niepoprawna data');
   const { results } = await env.DB.prepare(
-    `SELECT id, name, points, total_ms FROM runs WHERE day = ? AND finished = 1
-     ORDER BY points DESC, total_ms ASC, id ASC LIMIT 50`,
+    `SELECT id, name, meters, total_ms FROM runs WHERE day = ? AND mode = 'daily' AND finished = 1
+     ORDER BY meters DESC, total_ms ASC, id ASC LIMIT 50`,
   )
     .bind(day)
     .all();
-  const players = await env.DB.prepare('SELECT COUNT(*) AS n FROM runs WHERE day = ? AND finished = 1')
+  const players = await env.DB.prepare("SELECT COUNT(*) AS n FROM runs WHERE day = ? AND mode = 'daily' AND finished = 1")
     .bind(day)
     .first();
   const out = {
@@ -275,8 +350,8 @@ async function handleLeaderboard(request, env, now) {
     rows: results.map((r, i) => ({
       rank: i + 1,
       name: r.name,
-      points: r.points,
-      depth: r.points * METERS_PER_POINT,
+      points: pointsOf(r.meters),
+      depth: r.meters,
       ms: r.total_ms,
     })),
   };
@@ -295,7 +370,7 @@ function safeEqual(a, b) {
   return diff === 0;
 }
 
-/** Najczęstsze niedopasowane odpowiedzi: surowiec do rozbudowy bazy o nowe wpisy. */
+/** Najczęstsze odpowiedzi bez echa (po jednym głosie na gracza): surowiec do rozbudowy bazy o nowe wpisy. */
 async function handleUnmatched(request, env) {
   const auth = request.headers.get('authorization') || '';
   const expected = env.ADMIN_TOKEN ? `Bearer ${env.ADMIN_TOKEN}` : null;
@@ -304,9 +379,8 @@ async function handleUnmatched(request, env) {
   const min = Math.max(1, Number(url.searchParams.get('min')) || 2);
   const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit')) || 200));
   const { results } = await env.DB.prepare(
-    `SELECT prompt_id, norm, MIN(raw) AS sample, COUNT(*) AS n
-     FROM answers WHERE key IS NULL AND norm != ''
-     GROUP BY prompt_id, norm HAVING n >= ? ORDER BY n DESC LIMIT ?`,
+    `SELECT prompt_id, norm, MIN(raw) AS sample, COUNT(DISTINCT run_id) AS n
+     FROM misses GROUP BY prompt_id, norm HAVING n >= ? ORDER BY n DESC LIMIT ?`,
   )
     .bind(min, limit)
     .all();

@@ -118,13 +118,13 @@ Po zmianach w kodzie lub treści: `npm test`, potem `npm run deploy`. Migracje b
 
 ## 5. Rozbudowa bazy odpowiedzi
 
-Odpowiedzi, których nie ma w bazie, dostają 0 punktów i trafiają do kolejki. Podejrzysz najczęstsze:
+Odpowiedzi, których nie ma w bazie, nie kończą pytania (gracz próbuje dalej), ale trafiają do kolejki. Podejrzysz najczęstsze:
 
 ```
 curl -H "Authorization: Bearer TWOJ_ADMIN_TOKEN" "https://glebia.<twoja-nazwa>.workers.dev/api/admin/unmatched?min=2"
 ```
 
-(Windows PowerShell: `curl.exe`, nie `curl`.) Dopisz wartościowe odpowiedzi do plików w `src/content/` z właściwym poziomem rzadkości (1-6) i wdróż ponownie. Poziomy są oceną redakcyjną i warto je korygować na podstawie tego, co wpisują gracze.
+(Windows PowerShell: `curl.exe`, nie `curl`.) Dopisz wartościowe odpowiedzi do plików w `src/content/` z właściwą głębokością w metrach (np. 200 dla czegoś, co zna każdy, kilka tysięcy dla niszy) i wdróż ponownie. Głębokości są oceną redakcyjną i warto je korygować na podstawie tego, co wpisują gracze.
 
 ## 6. Najczęstsze problemy
 

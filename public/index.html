@@ -32,9 +32,9 @@
   </header>
 
   <aside id="ruler" aria-hidden="true">
-    <div class="ruler-track" id="ruler-track">
-      <div class="you" id="ruler-you"><span>Ty</span></div>
-    </div>
+    <div class="ruler-line"></div>
+    <div class="ruler-ticks" id="ruler-ticks"></div>
+    <div class="you" id="ruler-you"><span>Ty</span></div>
   </aside>
 
   <main class="stage" aria-live="polite">
@@ -42,28 +42,37 @@
     <section id="view-start" class="view center">
       <div class="panel px">
         <h1 class="logo">Głębia</h1>
-        <p class="lead">Siedem pytań, 25 sekund na każde. Wpisz odpowiedź, na którą wpadnie jak najmniej osób, a zejdziesz jak najgłębiej.</p>
+        <p class="lead">Siedem pytań, 25 sekund na każde. Im rzadsza odpowiedź, tym głębiej zejdziesz, a dna nie ma. Brak echa to nie pudło: próbuj dalej, dopóki płynie czas.</p>
         <form id="start-form" autocomplete="off">
-          <label for="name">Twój pseudonim w rankingu</label>
-          <input id="name" name="name" type="text" maxlength="16" minlength="2" required placeholder="np. Rekin z Gdyni">
-          <button type="submit" class="btn" id="start-btn">Zanurkuj</button>
+          <label for="name">Pseudonim w rankingu</label>
+          <input id="name" name="name" type="text" maxlength="16" minlength="2" placeholder="np. Rekin z Gdyni">
+          <div class="modes">
+            <button type="submit" class="btn mode" id="start-daily">
+              <b id="daily-title">Gra rankingowa</b>
+              <small id="daily-sub">Raz dziennie, te same pytania dla wszystkich</small>
+            </button>
+            <button type="button" class="btn cyan mode" id="start-free">
+              <b>Gra swobodna</b>
+              <small>Bez limitu, losowe pytania, bez rankingu</small>
+            </button>
+          </div>
         </form>
-        <ul class="legend" aria-label="Skala rzadkości">
-          <li><i class="sq t1"></i>Płycizna 10</li>
-          <li><i class="sq t2"></i>Znane 25</li>
-          <li><i class="sq t3"></i>Niezłe 40</li>
-          <li><i class="sq t4"></i>Rzadkie 60</li>
-          <li><i class="sq t5"></i>Głębinowe 80</li>
-          <li><i class="sq t6"></i>Legenda głębin 100</li>
+        <ul class="legend" aria-label="Skala głębokości">
+          <li><i class="sq t1"></i>do 200 m Każdy zna</li>
+          <li><i class="sq t2"></i>do 500 m Znane</li>
+          <li><i class="sq t3"></i>do 1,5 km Niezłe</li>
+          <li><i class="sq t4"></i>do 4 km Rzadkie</li>
+          <li><i class="sq t5"></i>do 10 km Głębinowe</li>
+          <li><i class="sq t6"></i>dalej Legenda głębin</li>
         </ul>
-        <p class="note"><span id="start-day"></span> Jedno podejście dziennie. <span id="start-reset"></span></p>
+        <p class="note"><span id="start-day"></span> <span id="start-reset"></span></p>
       </div>
     </section>
 
     <section id="view-play" class="view" hidden>
       <div class="prompt-panel px">
         <h2 id="play-prompt" class="prompt"></h2>
-        <p class="sub">▼ im rzadsza odpowiedź, tym głębiej ▼</p>
+        <p class="sub" id="play-sub">▼ im rzadsza odpowiedź, tym głębiej ▼</p>
       </div>
       <div class="dock">
         <p id="play-hint" class="hint">Czas ruszy za chwilę. Przeczytaj pytanie.</p>
@@ -98,7 +107,7 @@
 
     <section id="view-final" class="view center" hidden>
       <div class="panel px wide">
-        <h2 class="final-title">Dno osiągnięte</h2>
+        <h2 class="final-title" id="final-title">Dno osiągnięte</h2>
         <p class="big" id="final-depth"></p>
         <p id="final-rank" class="lead"></p>
         <div class="squares" id="final-squares" aria-hidden="true"></div>
@@ -106,6 +115,10 @@
         <div class="row">
           <button type="button" class="btn" id="final-share">Skopiuj wynik</button>
           <button type="button" class="btn ghost" id="final-board">Ranking</button>
+        </div>
+        <div class="row">
+          <button type="button" class="btn cyan" id="final-again">Jeszcze raz swobodnie</button>
+          <button type="button" class="btn ghost" id="final-menu">Menu</button>
         </div>
         <p class="note" id="final-reset"></p>
       </div>

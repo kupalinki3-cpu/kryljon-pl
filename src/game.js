@@ -7,17 +7,25 @@ export const MIN_ANSWER_MS = 1_000; // dolna granica czasu odpowiedzi (remisy w 
 export const PROMPTS_PER_DAY = 7;
 export const MAX_ANSWER_LEN = 80;
 
-// Indeks = numer poziomu rzadkości. 0 = brak na liście / brak odpowiedzi.
-export const TIERS = [
-  { name: 'Pudło', points: 0 },
-  { name: 'Płycizna', points: 10 },
-  { name: 'Znane', points: 25 },
-  { name: 'Niezłe', points: 40 },
-  { name: 'Rzadkie', points: 60 },
-  { name: 'Głębinowe', points: 80 },
-  { name: 'Legenda głębin', points: 100 },
+// Głębokość odpowiedzi to liczba metrów zapisana przy wpisie (bez górnego limitu).
+// Pasma służą tylko do nazwy i koloru na ekranie; progi są redakcyjne i niekalibrowane.
+export const BANDS = [
+  { max: 200, tier: 1, name: 'Każdy zna' },
+  { max: 500, tier: 2, name: 'Znane' },
+  { max: 1500, tier: 3, name: 'Niezłe' },
+  { max: 4000, tier: 4, name: 'Rzadkie' },
+  { max: 10000, tier: 5, name: 'Głębinowe' },
+  { max: Infinity, tier: 6, name: 'Legenda głębin' },
 ];
-export const METERS_PER_POINT = 10;
+
+/** Pasmo dla liczby metrów. 0 m (brak odpowiedzi w czasie) ma własne pasmo o numerze 0. */
+export function depthBand(meters) {
+  if (!(meters > 0)) return { tier: 0, name: 'Brak odpowiedzi' };
+  return BANDS.find((b) => meters < b.max);
+}
+
+/** Wynik punktowy to głębokość podzielona przez 10 (jak w oryginale: 10 m za punkt). */
+export const pointsOf = (meters) => Math.round(meters / 10);
 
 /** Małe litery, bez polskich (i innych) znaków diakrytycznych, tylko [a-z0-9] rozdzielone spacją. */
 export function normalize(input) {
@@ -54,7 +62,7 @@ export function boundedLevenshtein(a, b, max) {
 const indexCache = new Map();
 
 /**
- * Wpis w kategorii: [poziom, "nazwa kanoniczna", ...aliasy].
+ * Wpis w kategorii: [metry, "nazwa kanoniczna", ...aliasy].
  * Zwraca { map: norm -> numer wpisu, keys: lista norm do dopasowania rozmytego }.
  * Duplikaty aliasów w jednej kategorii: wygrywa pierwszy wpis (testy wykrywają takie kolizje).
  */
@@ -77,7 +85,7 @@ export function buildIndex(prompt) {
  * Dopasowanie odpowiedzi do listy. Najpierw dokładne (po normalizacji), potem rozmyte
  * dla dłuższych nazw (>= 7 znaków): 1 literówka, a od 12 znaków 2 literówki,
  * i tylko gdy najlepszy wynik wskazuje jeden, jednoznaczny wpis.
- * Zwraca { entry: numer, tier, shown } albo null.
+ * Zwraca { entry: numer, meters, shown, norm } albo null.
  */
 export function matchAnswer(prompt, raw) {
   const norm = normalize(raw);
@@ -109,7 +117,7 @@ export function matchAnswer(prompt, raw) {
   }
   if (hit === undefined) return null;
   const entry = prompt.answers[hit];
-  return { entry: hit, tier: entry[0], shown: entry[1], norm };
+  return { entry: hit, meters: entry[0], shown: entry[1], norm };
 }
 
 // ---------- dzień w strefie Europe/Warsaw ----------

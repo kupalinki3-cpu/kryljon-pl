@@ -2,8 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PROMPTS } from '../src/content/index.js';
 import {
+  BANDS,
   PROMPTS_PER_DAY,
   boundedLevenshtein,
+  depthBand,
+  pointsOf,
   cleanName,
   isValidDay,
   matchAnswer,
@@ -41,12 +44,12 @@ test('treść: struktura, unikalność id, brak kolizji aliasów w kategorii', (
     assert.ok(p.text && p.text.length >= 3, `tekst ${p.id}`);
     assert.ok(p.answers.length >= 10, `za mało wpisów w ${p.id}`);
     const seen = new Map();
-    const tiers = new Set();
+    const spread = new Set();
     p.answers.forEach((entry, i) => {
-      const [tier, canonical, ...aliases] = entry;
-      assert.ok(Number.isInteger(tier) && tier >= 1 && tier <= 6, `${p.id}[${i}] poziom ${tier}`);
+      const [meters, canonical, ...aliases] = entry;
+      assert.ok(Number.isInteger(meters) && meters >= 10 && meters <= 100000, `${p.id}[${i}] metry ${meters}`);
       assert.equal(typeof canonical, 'string', `${p.id}[${i}] nazwa`);
-      tiers.add(tier);
+      spread.add(depthBand(meters).tier);
       for (const name of [canonical, ...aliases]) {
         assert.equal(typeof name, 'string');
         const n = normalize(name);
@@ -57,8 +60,23 @@ test('treść: struktura, unikalność id, brak kolizji aliasów w kategorii', (
         seen.set(n, i);
       }
     });
-    assert.ok(tiers.size >= 3, `${p.id}: za mało poziomów rzadkości (${[...tiers]})`);
+    assert.ok(spread.size >= 2, `${p.id}: wszystkie wpisy w jednym paśmie głębokości`);
   }
+});
+
+test('pasma głębokości i punkty z metrów', () => {
+  assert.equal(depthBand(0).tier, 0);
+  assert.equal(depthBand(-5).tier, 0);
+  assert.equal(depthBand(NaN).tier, 0);
+  assert.equal(depthBand(150).tier, 1);
+  assert.equal(depthBand(200).tier, 2);
+  assert.equal(depthBand(3999).tier, 4);
+  assert.equal(depthBand(10000).tier, 6);
+  assert.equal(depthBand(1e9).name, 'Legenda głębin', 'brak górnej granicy głębokości');
+  assert.ok(BANDS.every((b, i) => i === 0 || b.max > BANDS[i - 1].max));
+  assert.equal(pointsOf(0), 0);
+  assert.equal(pointsOf(5000), 500);
+  assert.equal(pointsOf(204), 20);
 });
 
 test('treść: pytania dnia da się ułożyć i zawierają różne kategorie', () => {
@@ -76,13 +94,24 @@ test('treść: pytania dnia da się ułożyć i zawierają różne kategorie', (
 
 test('matchAnswer: dokładne dopasowanie bez diakrytyków i wielkości liter', () => {
   const p = byId('przedmiot');
-  assert.equal(matchAnswer(p, 'HISTORIA SZTUKI').tier, 4);
+  const r = matchAnswer(p, 'HISTORIA SZTUKI');
+  assert.equal(r.shown, 'historia sztuki');
+  assert.ok(r.meters > 1000 && r.meters < 4000);
   assert.equal(matchAnswer(p, 'wos').shown, 'wiedza o społeczeństwie');
-  assert.equal(matchAnswer(p, 'jezyk kaszubski').tier, 6);
   assert.equal(matchAnswer(p, 'łacina').shown, 'język łaciński i kultura antyczna');
   assert.equal(matchAnswer(p, 'wf'), null);
   assert.equal(matchAnswer(p, ''), null);
   assert.equal(matchAnswer(p, '   '), null);
+});
+
+test('polski internet: znany twórca płytko, a nieznany głęboko', () => {
+  const t = byId('tworca');
+  const jumper = matchAnswer(t, 'paweł jumper');
+  assert.equal(jumper.shown, 'Paweł Jumper');
+  assert.ok(jumper.meters >= 100 && jumper.meters <= 300, `Jumper ${jumper.meters} m`);
+  assert.equal(matchAnswer(t, 'JUMPER').shown, 'Paweł Jumper');
+  const imie = byId('imie');
+  assert.ok(matchAnswer(imie, 'Gostomir').meters > matchAnswer(imie, 'Jan').meters * 10);
 });
 
 test('matchAnswer: literówki tylko w dłuższych nazwach i tylko jednoznacznie', () => {
@@ -99,8 +128,8 @@ test('matchAnswer: literówki tylko w dłuższych nazwach i tylko jednoznacznie'
 });
 
 test('matchAnswer: nazwy wymyślone nie przechodzą', () => {
-  assert.equal(matchAnswer(byId('pierwiastek'), 'unobtainium'), null);
-  assert.equal(matchAnswer(byId('stolica'), 'Atlantyda'), null);
+  assert.equal(matchAnswer(byId('miasto'), 'Atlantyda'), null);
+  assert.equal(matchAnswer(byId('tworca'), 'uga buga balabuba'), null);
 });
 
 test('warsawDay i msUntilNextDay poprawnie przechodzą przez zmianę czasu', () => {

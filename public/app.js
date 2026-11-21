@@ -1,11 +1,13 @@
 import { createScene } from './scene.js';
 
 // Klient gry Głębia. Wszystkie napisy od graczy trafiają do DOM wyłącznie przez textContent.
-const MAX_DEPTH = 7000; // 7 pytań * 100 pkt * 10 m
 const LIMIT_MS = 25000; // musi zgadzać się z src/game.js; serwer i tak liczy czas sam
+const GRACE_MS = 1500;
 const TIER_SQUARES = ['⬛', '⬜', '🟦', '🟩', '🟨', '🟧', '🟪'];
 
 const $ = (id) => document.getElementById(id);
+let mode = 'daily'; // 'daily' = rankingowa, 'free' = swobodna
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const views = ['start', 'play', 'reveal', 'final'];
 const show = (name) => views.forEach((v) => ($(`view-${v}`).hidden = v !== name));
 
@@ -32,7 +34,7 @@ const token = playerToken();
 async function api(method, path, body) {
   const init = { method, headers: { 'x-player-token': token } };
   if (body) {
-    init.body = JSON.stringify({ token, ...body });
+    init.body = JSON.stringify({ token, mode, ...body });
     init.headers['content-type'] = 'application/json';
   }
   let res;
@@ -74,25 +76,61 @@ const FLAVOR = [
   'Tu nie zagląda prawie nikt.',
 ];
 
-function buildRuler() {
-  const track = $('ruler-track');
-  for (let m = 0; m <= MAX_DEPTH; m += 500) {
-    const t = document.createElement('div');
-    t.className = m % 1000 === 0 ? 'tick major' : 'tick';
-    t.style.top = `${(m / MAX_DEPTH) * 100}%`;
-    if (m % 1000 === 0 && m > 0) {
-      const s = document.createElement('span');
-      s.textContent = `${m / 1000} km`;
-      t.append(s);
+// Linijka głębokości przewija się razem z krylem i nie ma końca; elementy są w puli i tylko zmieniają pozycję.
+const RULER_STEPS = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000];
+const rulerLabel = (m) => (m >= 1000 ? `${(m / 1000).toLocaleString('pl-PL')} km` : `${m} m`);
+
+function createRuler() {
+  const box = $('ruler');
+  const wrap = $('ruler-ticks');
+  const you = $('ruler-you');
+  const pool = [];
+  let top = 0;
+  let height = 0;
+  const measure = () => {
+    const r = box.getBoundingClientRect();
+    top = r.top;
+    height = r.height;
+  };
+  measure();
+  addEventListener('resize', measure);
+  return ({ camY, S, K, youY }) => {
+    const pxPerM = K * S;
+    const stepM = RULER_STEPS.find((v) => v * pxPerM >= 64) ?? RULER_STEPS[RULER_STEPS.length - 1];
+    const minor = stepM / 5;
+    const mTop = (camY + top / S) / K;
+    const mBot = (camY + (top + height) / S) / K;
+    const i0 = Math.max(0, Math.ceil(mTop / minor));
+    const i1 = Math.floor(mBot / minor);
+    let n = 0;
+    for (let i = i0; i <= i1; i++, n++) {
+      let el = pool[n];
+      if (!el) {
+        el = document.createElement('div');
+        el.append(document.createElement('span'));
+        wrap.append(el);
+        pool[n] = el;
+      }
+      const m = i * minor;
+      const major = i % 5 === 0;
+      el.style.display = '';
+      el.className = major ? 'tick major' : 'tick';
+      el.style.transform = `translateY(${((m * K - camY) * S - top).toFixed(1)}px)`;
+      const span = el.firstChild;
+      const label = major ? rulerLabel(m) : '';
+      if (span.textContent !== label) span.textContent = label;
     }
-    track.append(t);
-  }
+    for (let j = n; j < pool.length; j++) pool[j].style.display = 'none';
+    const y = Math.max(0, Math.min(height, youY - top));
+    you.style.transform = `translateY(${y.toFixed(1)}px)`;
+  };
 }
 
+const drawRuler = createRuler();
 const scene = createScene($('scene'), {
-  onDepth(d) {
-    $('hud-depth').textContent = fmtDepth(Math.round(d));
-    $('ruler-you').style.top = `${Math.min(100, (d / MAX_DEPTH) * 100)}%`;
+  onFrame(f) {
+    $('hud-depth').textContent = fmtDepth(Math.round(f.depth));
+    drawRuler(f);
   },
 });
 const setDepth = (m, animate = false) => scene.setDepth(m, animate);
@@ -109,8 +147,9 @@ function renderHud(currentIdx) {
   }
   $('hud-score').textContent = String(state?.points ?? 0);
   const total = state?.total ?? 7;
-  $('hud-prompt').textContent =
-    currentIdx == null || currentIdx >= total ? 'Nurkowanie zakończone' : `Pytanie ${currentIdx + 1} z ${total}`;
+  $('hud-prompt').textContent = !state
+    ? 'Wybierz tryb gry'
+    : currentIdx == null || currentIdx >= total ? 'Nurkowanie zakończone' : `Pytanie ${currentIdx + 1} z ${total}`;
 }
 
 // ---------- stan gry ----------
@@ -126,10 +165,10 @@ function stopTimer() {
 
 async function loadToday() {
   today = await api('GET', '/api/today');
-  $('start-day').textContent = `Dzień ${today.day}. ${today.total} pytań.`;
+  $('start-day').textContent = `Dzień ${today.day}.`;
   const upd = () => {
     const left = today.resetsInMs - (performance.now() - today.fetchedAt);
-    const txt = `Nowe pytania za ${fmtHm(left)}.`;
+    const txt = `Nowe pytania rankingowe za ${fmtHm(left)}.`;
     $('start-reset').textContent = txt;
     $('final-reset').textContent = txt;
   };
@@ -138,13 +177,41 @@ async function loadToday() {
   setInterval(upd, 30000);
 }
 
-async function startRun(name) {
-  state = await api('POST', '/api/run', { name });
-  store.set('name', name);
-  store.set('day', state.day);
+let dailyDone = null; // zakończony dziś bieg rankingowy (stan z serwera)
+
+function enterRun(newState, newMode) {
+  mode = newMode;
+  state = newState;
+  store.set('last', newMode);
   setDepth(state.depth, false);
   renderHud(state.idx);
+  $('play-sub').textContent = newMode === 'daily' ? '▼ im rzadsza odpowiedź, tym głębiej ▼' : '▼ swobodna gra: bez rankingu, bez limitu ▼';
+}
+
+async function startDaily(name) {
+  if (dailyDone && store.get('day') === today.day) {
+    enterRun(dailyDone, 'daily');
+    return route();
+  }
+  enterRun(await api('POST', '/api/run', { mode: 'daily', name }), 'daily');
+  store.set('name', name);
+  store.set('day', state.day);
   await route();
+}
+
+async function startFree(name) {
+  const body = { mode: 'free', fresh: true };
+  if (name) body.name = name;
+  enterRun(await api('POST', '/api/run', body), 'free');
+  await route();
+}
+
+function updateStartButtons() {
+  const done = dailyDone && today && store.get('day') === today.day;
+  $('daily-title').textContent = done ? 'Dzisiejszy wynik' : 'Gra rankingowa';
+  $('daily-sub').textContent = done
+    ? 'Rankingowa gra na dziś ukończona. Zobacz miejsce.'
+    : 'Raz dziennie, te same pytania dla wszystkich';
 }
 
 async function route() {
@@ -168,11 +235,12 @@ function showPrompt(p) {
   input.value = '';
   input.disabled = true;
   btn.disabled = true;
-  $('play-hint').textContent = 'Czas ruszy za chwilę. Przeczytaj pytanie.';
+  setHint('Czas ruszy za chwilę. Przeczytaj pytanie.');
   const ring = $('ring');
   const circ = 2 * Math.PI * 44;
   const text = $('timer-text');
   const t0 = performance.now();
+  deadline = t0 + p.remainingMs;
   let unlocked = false;
   const frame = () => {
     const elapsed = performance.now() - t0;
@@ -189,7 +257,7 @@ function showPrompt(p) {
       input.disabled = false;
       btn.disabled = false;
       input.focus();
-      $('play-hint').textContent = 'Wpisz odpowiedź i zatwierdź Enterem.';
+      setHint('Wpisz odpowiedź i zatwierdź Enterem. Brak echa? Spróbuj jeszcze raz.');
     }
     if (remaining <= 0) {
       stopTimer();
@@ -208,22 +276,70 @@ function showPrompt(p) {
   currentIdx = p.idx;
 }
 let currentIdx = 0;
+let deadline = 0; // performance.now() chwili, w której kończy się czas na bieżące pytanie
+
+function setHint(text, bad = false) {
+  const el = $('play-hint');
+  el.textContent = text;
+  el.classList.toggle('noecho', bad);
+}
+
+/** Czas minął, a ostatnia próba nie trafiła: serwer sam zapisze puste pytanie, gdy minie tolerancja. */
+async function settleAfterExpiry() {
+  stopTimer();
+  for (let i = 0; i < 5; i++) {
+    await sleep(GRACE_MS + 400);
+    try {
+      const r = await api('POST', '/api/answer', { idx: currentIdx, answer: '' });
+      if (r.result) {
+        state = r.state;
+        return showReveal(r.result, true);
+      }
+    } catch (e) {
+      if (e.status === 409 && e.data?.state) {
+        state = e.data.state;
+        const h = state.history.find((x) => x.idx === currentIdx);
+        if (h) return showReveal({ ...h, share: null }, true);
+        return route();
+      }
+      if (i === 4) return toast(e.message);
+    }
+  }
+}
 
 async function submit(auto = false) {
   if (submitting) return;
   submitting = true;
-  stopTimer();
+  if (auto) stopTimer();
   const input = $('answer');
   const answer = input.value;
   input.disabled = true;
   $('answer-btn').disabled = true;
   try {
     const r = await api('POST', '/api/answer', { idx: currentIdx, answer });
+    if (r.noEcho) {
+      // Brak echa: to nie jest pudło, pytanie trwa dalej i można próbować ponownie.
+      if (auto || performance.now() >= deadline) return settleAfterExpiry();
+      submitting = false;
+      input.disabled = false;
+      $('answer-btn').disabled = false;
+      input.value = '';
+      input.focus();
+      if (r.empty) return setHint('Wpisz odpowiedź.', true);
+      setHint(`Brak echa dla „${r.raw}”. Spróbuj jeszcze raz.`, true);
+      scene.ping();
+      input.classList.remove('shake');
+      void input.offsetWidth;
+      input.classList.add('shake');
+      return;
+    }
+    stopTimer();
     state = r.state;
     showReveal(r.result, auto);
   } catch (e) {
     if (e.status === 409 && e.data?.state) {
       // Serwer już zamknął to pytanie (np. minął czas): pokaż zapisany wynik z historii.
+      stopTimer();
       state = e.data.state;
       const h = state.history.find((x) => x.idx === currentIdx);
       if (h) return showReveal({ ...h, share: null }, true);
@@ -241,11 +357,12 @@ function showReveal(res, auto) {
   const badge = $('reveal-badge');
   badge.className = `badge t${res.tier}`;
   badge.textContent = res.label;
-  $('reveal-points').textContent = `+${res.points} pkt · w dół o ${fmtDepth(res.points * 10)}`;
+  $('reveal-points').textContent = res.meters > 0
+    ? `${fmtDepth(res.meters)} w dół · +${res.points} pkt`
+    : 'Ani metra w dół · 0 pkt';
   const line = $('reveal-line');
   if (res.shown) line.textContent = `Rozpoznano: ${res.shown}`;
-  else if (res.raw) line.textContent = `„${res.raw}” nie ma jeszcze w bazie, więc 0 punktów.`;
-  else line.textContent = auto ? 'Czas minął bez odpowiedzi.' : 'Brak odpowiedzi.';
+  else line.textContent = auto ? 'Czas minął bez trafienia.' : 'Brak odpowiedzi.';
   $('reveal-share').textContent = res.share
     ? `Taką samą odpowiedź wpisało dziś ${res.share.percent}% z ${res.share.total} graczy.`
     : FLAVOR[res.tier] ?? '';
@@ -259,7 +376,8 @@ function showReveal(res, auto) {
 function shareText() {
   const squares = state.history.map((h) => TIER_SQUARES[h.tier] ?? '⬛').join('');
   const rank = state.me ? ` (miejsce ${state.me.rank}/${state.me.players})` : '';
-  return `Głębia ${state.day}\n${fmtDepth(state.depth)}${rank}\n${squares}\n${location.origin}`;
+  const label = mode === 'daily' ? state.day : 'gra swobodna';
+  return `Głębia ${label}\n${fmtDepth(state.depth)}${rank}\n${squares}\n${location.origin}`;
 }
 
 function showFinal() {
@@ -268,9 +386,13 @@ function showFinal() {
   renderHud(null);
   setDepth(state.depth, false);
   $('final-depth').textContent = fmtDepth(state.depth);
+  const daily = mode === 'daily';
+  $('final-title').textContent = daily ? 'Dno osiągnięte' : 'Koniec nurkowania';
   $('final-rank').textContent = state.me
     ? `Miejsce ${state.me.rank} z ${state.me.players} w dzisiejszym rankingu.`
-    : '';
+    : daily ? '' : 'Gra swobodna nie wchodzi do rankingu.';
+  $('final-again').textContent = daily ? 'Zagraj swobodnie' : 'Jeszcze raz';
+  $('final-reset').hidden = !daily;
   $('final-squares').textContent = state.history.map((h) => TIER_SQUARES[h.tier] ?? '⬛').join('');
   const list = $('final-recap');
   list.replaceChildren();
@@ -280,10 +402,14 @@ function showFinal() {
     dot.className = `tier-dot t${h.tier}`;
     const strong = document.createElement('strong');
     strong.textContent = h.shown || (h.raw ? h.raw : 'brak odpowiedzi');
-    li.append(dot, document.createTextNode(`${h.prompt}: `), strong, document.createTextNode(` · ${h.label}, ${h.points} pkt`));
+    li.append(dot, document.createTextNode(`${h.prompt}: `), strong, document.createTextNode(` · ${h.label}, ${fmtDepth(h.meters)}`));
     list.append(li);
   }
-  loadBoard('today');
+  if (daily) {
+    dailyDone = state;
+    updateStartButtons();
+    loadBoard('today');
+  }
 }
 
 // ---------- ranking ----------
@@ -334,17 +460,40 @@ async function loadBoard(which) {
 }
 
 // ---------- zdarzenia ----------
-$('start-form').addEventListener('submit', async (ev) => {
-  ev.preventDefault();
-  const btn = $('start-btn');
+const nameValue = () => $('name').value.trim();
+const busy = (btn, fn) => async () => {
   btn.disabled = true;
   try {
-    await startRun($('name').value.trim());
+    await fn();
   } catch (e) {
     toast(e.message);
   } finally {
     btn.disabled = false;
   }
+};
+$('start-form').addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const name = nameValue();
+  const done = dailyDone && store.get('day') === today?.day;
+  if (!done && (name.length < 2 || name.length > 16)) {
+    $('name').focus();
+    return toast('Do rankingu potrzebny jest pseudonim (2 do 16 znaków).');
+  }
+  busy($('start-daily'), () => startDaily(name))();
+});
+$('start-free').addEventListener('click', () => {
+  const name = nameValue();
+  busy($('start-free'), () => startFree(name.length >= 2 && name.length <= 16 ? name : ''))();
+});
+$('final-again').addEventListener('click', busy($('final-again'), () => startFree(store.get('name') || '')));
+$('final-menu').addEventListener('click', () => {
+  stopTimer();
+  setDepth(0, false);
+  $('hud-steps').replaceChildren();
+  $('hud-score').textContent = '0';
+  $('hud-prompt').textContent = 'Wybierz tryb gry';
+  updateStartButtons();
+  show('start');
 });
 $('answer-form').addEventListener('submit', (ev) => {
   ev.preventDefault();
@@ -381,16 +530,42 @@ $('tab-today').addEventListener('click', () => loadBoard('today'));
 $('tab-yesterday').addEventListener('click', () => loadBoard('yesterday'));
 
 // ---------- start ----------
+async function tryResumeFree() {
+  try {
+    enterRun(await api('POST', '/api/run', { mode: 'free', resume: true }), 'free');
+    await route();
+    return true;
+  } catch (e) {
+    if (e.status === 404) return false;
+    throw e;
+  }
+}
+
+async function tryResumeDaily(savedName) {
+  const s = await api('POST', '/api/run', { mode: 'daily', name: savedName });
+  if (s.finished) {
+    dailyDone = s;
+    return false;
+  }
+  enterRun(s, 'daily');
+  await route();
+  return true;
+}
+
 (async function init() {
-  buildRuler();
   renderHud(null);
   show('start');
   const savedName = store.get('name');
   if (savedName) $('name').value = savedName;
   try {
     await loadToday();
-    // Wznów dzisiejszy bieg tylko jeśli ta przeglądarka już dziś zaczęła (nie zakładamy biegu po cichu).
-    if (savedName && store.get('day') === today.day) await startRun(savedName);
+    // Wznawiamy tylko to, co ta przeglądarka już zaczęła; nic nie zakładamy po cichu.
+    const last = store.get('last');
+    let resumed = false;
+    if (last === 'free') resumed = await tryResumeFree();
+    if (!resumed && savedName && store.get('day') === today.day) resumed = await tryResumeDaily(savedName);
+    if (!resumed && last !== 'free') resumed = await tryResumeFree();
+    updateStartButtons();
   } catch (e) {
     toast(e.message);
   }
