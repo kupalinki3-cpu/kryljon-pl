@@ -19,6 +19,9 @@ import uzupMasa3 from './uzup-masa3.js';
 import uzupMasa4 from './uzup-masa4.js';
 import uzupMasa5 from './uzup-masa5.js';
 import nowe from './nowe.js';
+import nowe2 from './nowe2.js';
+import nowe3 from './nowe3.js';
+import nowe4 from './nowe4.js';
 import { normalize } from '../game.js';
 
 // Id kategorii nigdy nie usuwamy ani nie zmieniamy: zapisane dni w bazie wskazują na nie po id.
@@ -29,7 +32,7 @@ for (const part of [uzupelnieniaPodstawowe, uzupPrzyroda, uzupKultura, uzupLudzi
 
 const BASE = [
   ...nauka, ...przyroda, ...geografia, ...kultura, ...internet,
-  ...miejsca, ...ludzie, ...sportSzkola, ...polskiNet, ...nowe,
+  ...miejsca, ...ludzie, ...sportSzkola, ...polskiNet, ...nowe, ...nowe2, ...nowe3, ...nowe4,
 ];
 
 /**

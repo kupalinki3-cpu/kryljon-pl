@@ -1,4 +1,5 @@
 import { createScene } from './scene.js';
+import { sfx } from './sfx.js';
 
 // Klient gry Głębia. Wszystkie napisy od graczy trafiają do DOM wyłącznie przez textContent.
 const LIMIT_MS = 25000; // musi zgadzać się z src/game.js; serwer i tak liczy czas sam
@@ -152,6 +153,21 @@ function renderHud(currentIdx) {
     : currentIdx == null || currentIdx >= total ? 'Nurkowanie zakończone' : `Pytanie ${currentIdx + 1} z ${total}`;
 }
 
+// ---------- dźwięk ----------
+sfx.setMuted(store.get('muted') === '1');
+function paintSound() {
+  const btn = $('sound-btn');
+  btn.setAttribute('aria-pressed', String(!sfx.muted));
+  btn.setAttribute('aria-label', sfx.muted ? 'Dźwięk wyłączony' : 'Dźwięk włączony');
+}
+$('sound-btn').addEventListener('click', () => {
+  sfx.setMuted(!sfx.muted);
+  store.set('muted', sfx.muted ? '1' : '0');
+  paintSound();
+  sfx.start();
+});
+paintSound();
+
 // ---------- stan gry ----------
 let state = null; // ostatni stan biegu z serwera
 let today = null; // odpowiedź /api/today
@@ -178,6 +194,51 @@ async function loadToday() {
 }
 
 let dailyDone = null; // zakończony dziś bieg rankingowy (stan z serwera)
+
+// ---------- statystyki lokalne (tylko w tej przeglądarce) ----------
+function readStats() {
+  try {
+    const s = JSON.parse(store.get('stats') || '{}');
+    return { runs: 0, bestDaily: 0, bestFree: 0, streak: 0, lastDay: '', bestAnswer: 0, ...s };
+  } catch {
+    return { runs: 0, bestDaily: 0, bestFree: 0, streak: 0, lastDay: '', bestAnswer: 0 };
+  }
+}
+const dayBefore = (day) => new Date(Date.parse(`${day}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
+
+/** Zapisuje ukończony bieg raz i zwraca { record, streak }. */
+function recordRun(finalState, runMode) {
+  const key = `${runMode}:${finalState.day}:${finalState.history.length}:${finalState.depth}`;
+  const st = readStats();
+  if (store.get('recorded') === key) return { record: false, streak: st.streak };
+  store.set('recorded', key);
+  st.runs += 1;
+  let record = false;
+  if (runMode === 'daily') {
+    if (finalState.depth > st.bestDaily) { record = st.bestDaily > 0; st.bestDaily = finalState.depth; }
+    if (st.lastDay !== finalState.day) {
+      st.streak = st.lastDay === dayBefore(finalState.day) ? st.streak + 1 : 1;
+      st.lastDay = finalState.day;
+    }
+  } else if (finalState.depth > st.bestFree) {
+    record = st.bestFree > 0;
+    st.bestFree = finalState.depth;
+  }
+  st.bestAnswer = Math.max(st.bestAnswer, ...finalState.history.map((h) => h.meters || 0));
+  store.set('stats', JSON.stringify(st));
+  return { record, streak: st.streak };
+}
+
+function renderStartStats() {
+  const st = readStats();
+  const el = $('start-stats');
+  if (!st.runs) { el.hidden = true; return; }
+  const best = Math.max(st.bestDaily, st.bestFree);
+  const parts = [`Nurkowań: ${st.runs}`, `Rekord: ${fmtDepth(best)}`];
+  if (st.streak > 1) parts.push(`Seria: ${st.streak} dni z rzędu`);
+  el.textContent = parts.join(' · ');
+  el.hidden = false;
+}
 
 function enterRun(newState, newMode) {
   mode = newMode;
@@ -242,6 +303,8 @@ function showPrompt(p) {
   const t0 = performance.now();
   deadline = t0 + p.remainingMs;
   let unlocked = false;
+  let lastTickSec = 0;
+  $('ring').closest('.timer').classList.remove('urgent');
   const frame = () => {
     const elapsed = performance.now() - t0;
     const toStart = p.startsInMs - elapsed;
@@ -257,10 +320,12 @@ function showPrompt(p) {
       input.disabled = false;
       btn.disabled = false;
       input.focus();
+      sfx.start();
       setHint('Wpisz odpowiedź i zatwierdź Enterem. Brak echa? Spróbuj jeszcze raz.');
     }
     if (remaining <= 0) {
       stopTimer();
+      $('ring').closest('.timer').classList.remove('urgent');
       text.textContent = '0';
       ring.style.strokeDashoffset = String(circ);
       submit(true);
@@ -270,6 +335,9 @@ function showPrompt(p) {
     ring.style.strokeDashoffset = String(circ * (1 - remaining / LIMIT_MS));
     ring.classList.toggle('warn', remaining < 10000 && remaining >= 5000);
     ring.classList.toggle('danger', remaining < 5000);
+    $('ring').closest('.timer').classList.toggle('urgent', remaining < 5000);
+    const sec = Math.ceil(remaining / 1000);
+    if (sec <= 3 && sec !== lastTickSec) { lastTickSec = sec; sfx.tick(); }
   };
   frame();
   tickTimer = setInterval(frame, 100);
@@ -328,6 +396,7 @@ async function submit(auto = false) {
       if (r.empty) return setHint('Wpisz odpowiedź.', true);
       setHint(`Brak echa dla „${r.raw}”. Spróbuj jeszcze raz.`, true);
       scene.ping();
+      sfx.noEcho();
       input.classList.remove('shake');
       void input.offsetWidth;
       input.classList.add('shake');
@@ -369,6 +438,8 @@ function showReveal(res, auto) {
   renderHud(state.finished ? null : state.idx);
   setDepth(state.depth, true);
   scene.burst();
+  sfx.reveal(res.tier);
+  $('ring').closest('.timer').classList.remove('urgent');
   $('reveal-next').textContent = state.finished ? 'Zobacz wynik ▼' : 'Głębiej ▼';
   $('reveal-next').focus();
 }
@@ -393,9 +464,17 @@ function showFinal() {
     : daily ? '' : 'Gra swobodna nie wchodzi do rankingu.';
   $('final-again').textContent = daily ? 'Zagraj swobodnie' : 'Jeszcze raz';
   $('final-reset').hidden = !daily;
+  const { record, streak } = recordRun(state, mode);
+  const badge = $('final-badge');
+  const bits = [];
+  if (record) bits.push('Nowy rekord!');
+  if (daily && streak > 1) bits.push(`Seria: ${streak} dni z rzędu`);
+  badge.textContent = bits.join(' · ');
+  badge.hidden = bits.length === 0;
   $('final-squares').textContent = state.history.map((h) => TIER_SQUARES[h.tier] ?? '⬛').join('');
   const list = $('final-recap');
   list.replaceChildren();
+  const maxM = Math.max(1, ...state.history.map((h) => h.meters || 0));
   for (const h of state.history) {
     const li = document.createElement('li');
     const dot = document.createElement('span');
@@ -403,6 +482,18 @@ function showFinal() {
     const strong = document.createElement('strong');
     strong.textContent = h.shown || (h.raw ? h.raw : 'brak odpowiedzi');
     li.append(dot, document.createTextNode(`${h.prompt}: `), strong, document.createTextNode(` · ${h.label}, ${fmtDepth(h.meters)}`));
+    if (h.meters > 0 && h.meters === maxM && state.history.length > 1) {
+      const star = document.createElement('span');
+      star.className = 'star';
+      star.textContent = '★';
+      star.title = 'Najgłębsza odpowiedź w tym nurkowaniu';
+      li.append(star);
+    }
+    const bar = document.createElement('span');
+    bar.className = `bar t${h.tier}`;
+    bar.style.width = `${Math.max(3, Math.round((h.meters / maxM) * 100))}%`;
+    bar.setAttribute('aria-hidden', 'true');
+    li.append(bar);
     list.append(li);
   }
   if (daily) {
@@ -493,6 +584,7 @@ $('final-menu').addEventListener('click', () => {
   $('hud-score').textContent = '0';
   $('hud-prompt').textContent = 'Wybierz tryb gry';
   updateStartButtons();
+  renderStartStats();
   show('start');
 });
 $('answer-form').addEventListener('submit', (ev) => {
@@ -520,6 +612,10 @@ boardDlg.addEventListener('click', (ev) => {
 $('final-share').addEventListener('click', async () => {
   const text = shareText();
   try {
+    if (navigator.share && matchMedia('(pointer: coarse)').matches) {
+      await navigator.share({ text });
+      return;
+    }
     await navigator.clipboard.writeText(text);
     toast('Wynik skopiowany do schowka');
   } catch {
@@ -555,6 +651,7 @@ async function tryResumeDaily(savedName) {
 (async function init() {
   renderHud(null);
   show('start');
+  renderStartStats();
   const savedName = store.get('name');
   if (savedName) $('name').value = savedName;
   try {

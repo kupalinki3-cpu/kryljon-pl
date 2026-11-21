@@ -86,9 +86,9 @@ test('treść: pytania dnia da się ułożyć i zawierają różne kategorie', (
   assert.equal(new Set(pick).size, PROMPTS_PER_DAY);
   assert.deepEqual(pick, pickPromptIds('2026-11-20', ids), 'deterministyczne');
   assert.notDeepEqual(pick, pickPromptIds('2026-11-21', ids), 'zmienia się z dniem');
-  // Rozkład: w 60 dniach każda kategoria powinna się pojawić.
+  // Rozkład: przy ~100 kategoriach i 7 pytaniach dziennie w 1000 dniach każda kategoria powinna się pojawić.
   const seen = new Set();
-  for (let d = 1; d <= 60; d++) pickPromptIds(`2026-12-${String(d).padStart(2, '0')}`, ids).forEach((x) => seen.add(x));
+  for (let d = 1; d <= 1000; d++) pickPromptIds(`2027-day-${d}`, ids).forEach((x) => seen.add(x));
   assert.equal(seen.size, ids.length);
 });
 

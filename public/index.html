@@ -25,6 +25,7 @@
       <div class="steps" id="hud-steps" aria-hidden="true"></div>
       <span class="hud-label" id="hud-prompt">Pytanie 1 z 7</span>
     </div>
+    <button type="button" id="sound-btn" class="btn ghost icon" aria-label="Dźwięk włączony" aria-pressed="true" title="Dźwięk">♪</button>
     <div class="hud-box right">
       <span class="hud-label">Wynik</span>
       <span class="hud-val pink" id="hud-score">0</span>
@@ -65,6 +66,7 @@
           <li><i class="sq t5"></i>do 10 km Głębinowe</li>
           <li><i class="sq t6"></i>dalej Legenda głębin</li>
         </ul>
+        <p class="stats" id="start-stats" hidden></p>
         <p class="note"><span id="start-day"></span> <span id="start-reset"></span></p>
       </div>
     </section>
@@ -109,6 +111,7 @@
       <div class="panel px wide">
         <h2 class="final-title" id="final-title">Dno osiągnięte</h2>
         <p class="big" id="final-depth"></p>
+        <p id="final-badge" class="record" hidden></p>
         <p id="final-rank" class="lead"></p>
         <div class="squares" id="final-squares" aria-hidden="true"></div>
         <ol class="recap" id="final-recap"></ol>

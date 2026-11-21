@@ -77,11 +77,147 @@ const anglerR = sprite(20, 14, (R) => {
 });
 const anglerL = flipped(anglerR);
 
-const krill = sprite(9, 7, (R) => {
-  const rows = ['..rrrr...', '.rrrrrd..', 'rrwrrrrd.', 'rr..drrr.', 'r....drr.', '....rrrd.', '...rrrd..'];
-  const pal = { r: '#ff5c7a', d: '#bf3556', w: '#ffffff' };
-  rows.forEach((row, y) => [...row].forEach((ch, x) => ch !== '.' && R(pal[ch], x, y, 1, 1)));
-});
+// Krewetka na żyłce: 15x11 px, dwie klatki (nóżki i wachlarz ogona), odblask na grzbiecie, czułki.
+const KRILL_W = 15;
+const KRILL_H = 11;
+const KRILL_PAL = {
+  r: '#ff5c7a', l: '#ffa3b5', d: '#bf3556', D: '#8f2442', w: '#ffffff', k: '#1a0a12',
+  a: '#ffd9e0', t: '#ff7d94', g: '#e84a6a',
+};
+function krillFrame(rows) {
+  return sprite(KRILL_W, KRILL_H, (R) => {
+    rows.forEach((row, y) => [...row].forEach((ch, x) => ch !== '.' && R(KRILL_PAL[ch], x, y, 1, 1)));
+  });
+}
+const krillA = krillFrame([
+  '..........a.a..',
+  '.........a..a..',
+  '....lllll.a.a..',
+  '..llrrrrrrrr...',
+  '.llrrdrrdrrrwk.',
+  'tlrrd.rrd.rrrrr',
+  'ttrd..drd..rrd.',
+  'tt.d...d...ggD.',
+  '.t.....g.g.g...',
+  '......g..g.g...',
+  '...............',
+]);
+const krillB = krillFrame([
+  '..........a.a..',
+  '..........aa.a.',
+  '....lllll...a..',
+  '..llrrrrrrrr...',
+  '.llrrdrrdrrrwk.',
+  'tlrrd.rrd.rrrrr',
+  'ttrd..drd..rrd.',
+  '.tt.d..d...ggD.',
+  '.tt....g..g.g..',
+  '.......g.g..g..',
+  '...............',
+]);
+
+
+// ---- nowe stworzenia (sprite'y generowane kodem) ----
+const rowsSprite = (pal, rows) =>
+  sprite(rows[0].length, rows.length, (R) => rows.forEach((row, y) => [...row].forEach((ch, x) => ch !== '.' && R(pal[ch], x, y, 1, 1))));
+
+const turtleR = rowsSprite({ s: 'rgba(32,96,70,0.92)', h: 'rgba(120,205,150,0.9)', f: 'rgba(60,140,100,0.92)', e: '#10261c' }, [
+  '.....hhhhh........',
+  '...hhsssssshh.....',
+  '..hsshhsshhssff...',
+  '.fsshsshhsshssfff.',
+  '.fsshsshhsshsssfe.',
+  '..hsshhsshhssff...',
+  '...hhsssssshh.....',
+  '.....hhhhh........',
+]);
+const turtleL = flipped(turtleR);
+
+function silhouetteFish(w, h, bodyCol, bellyCol, hump, tailLen) {
+  // boczny sylwet ryby/ssaka; hump 0..1 — jak wypukły grzbiet
+  return sprite(w, h, (R) => {
+    const cy = Math.floor(h / 2);
+    const len = w - tailLen;
+    for (let x = 0; x < len; x++) {
+      const t = x / (len - 1);
+      const hh = Math.round((h / 2 - 1.5) * Math.sin(Math.PI * Math.pow(t, 0.7)) * (0.55 + 0.45 * hump));
+      R(bodyCol, tailLen + x, cy - hh, 1, hh * 2 + 1);
+      if (hh > 1) R(bellyCol, tailLen + x, cy + Math.floor(hh / 2), 1, Math.ceil(hh / 2) + 1);
+    }
+    // ogon rozwidlony
+    for (let i = 0; i < tailLen; i++) {
+      const sp = Math.round((i / tailLen) * (h / 2 - 1));
+      R(bodyCol, tailLen - 1 - i, cy - sp, 1, 1);
+      R(bodyCol, tailLen - 1 - i, cy + sp, 1, 1);
+      R(bodyCol, tailLen - 1 - i, cy, 1, 1);
+    }
+  });
+}
+const sharkR = (() => {
+  const base = silhouetteFish(34, 12, 'rgba(34,56,76,0.9)', 'rgba(150,176,192,0.75)', 0.8, 7);
+  return sprite(34, 15, (R, x) => {
+    x.drawImage(base, 0, 3);
+    R('rgba(34,56,76,0.9)', 17, 0, 1, 3); R('rgba(34,56,76,0.9)', 18, 1, 3, 2); R('rgba(34,56,76,0.9)', 16, 2, 6, 1);
+    R('#ffffff', 28, 6, 1, 1); R('#05080c', 29, 6, 1, 1);
+  });
+})();
+const sharkL = flipped(sharkR);
+const whaleR = (() => {
+  const body = silhouetteFish(86, 26, 'rgba(8,24,46,0.72)', 'rgba(96,140,172,0.34)', 0.9, 16);
+  return sprite(86, 32, (R, x) => {
+    x.drawImage(body, 0, 3);
+    R('rgba(8,24,46,0.72)', 30, 24, 14, 3); R('rgba(8,24,46,0.72)', 34, 27, 8, 2);
+    for (let i = 0; i < 6; i++) R('rgba(150,190,215,0.22)', 52 + i * 4, 18, 2, 1);
+    R('#cfe3f2', 74, 14, 1, 1);
+  });
+})();
+const whaleL = flipped(whaleR);
+const squid = rowsSprite({ s: 'rgba(214,72,108,0.88)', d: 'rgba(150,40,76,0.9)', e: '#ffe9a8', t: 'rgba(214,72,108,0.7)' }, [
+  '....ss....',
+  '...ssss...',
+  '..ssdsss..',
+  '..sssdss..',
+  '.sssssss..',
+  '.ssessess.',
+  '..sssss...',
+  '..t.t.t...',
+  '..t.t.t.t.',
+  '..t...t.t.',
+  '.t.....t..',
+]);
+const wreck = (() => {
+  const H = '#0b1521'; const M = '#122234'; const G = 'rgba(60,150,110,0.7)'; const W = '#ffcf6a';
+  return sprite(58, 34, (R) => {
+    // pochylony kadłub
+    for (let i = 0; i < 9; i++) R(H, 4 + i * 2, 20 + Math.floor(i * 0.9), 50 - i * 4, 2);
+    R(M, 2, 17, 54, 3);
+    R(H, 18, 7, 20, 10); R(M, 17, 6, 22, 2);
+    [21, 27, 33].forEach((x) => R(W, x, 10, 3, 3));
+    R(H, 12, 0, 1, 18); R(H, 8, 4, 9, 1); R(H, 44, 3, 1, 14); R(H, 41, 8, 7, 1);
+    R(G, 3, 16, 6, 2); R(G, 20, 6, 10, 1); R(G, 46, 17, 6, 2);
+    R(H, 50, 21, 6, 3);
+  });
+})();
+const reefOrange = rowsSprite({ o: '#ff8a2a', w: '#fff5e6', k: '#251008' }, ['..oo...', '.owwoo.', 'oowwoko', '.owwoo.', '..oo...']);
+const reefBlue = rowsSprite({ b: '#3a8dff', y: '#ffd44d', k: '#08142a' }, ['...bb..', '.bbbbb.', 'bbbbbkb', '.bbybb.', '..yb...']);
+const reefYellow = rowsSprite({ y: '#ffd44d', b: '#2a1a05', k: '#251008' }, ['..yy...', '.yyyyy.', 'yybyyky', '.yyyyy.', '..yy...']);
+const reefOrangeL = flipped(reefOrange); const reefBlueL = flipped(reefBlue); const reefYellowL = flipped(reefYellow);
+const mantaFrame = (flap) =>
+  sprite(30, 17, (R) => {
+    for (let x = 0; x < 22; x++) {
+      const t = x / 21;
+      const hh = Math.round((7 + flap) * Math.sin(Math.PI * Math.pow(t, 0.85)));
+      R('rgba(18,36,62,0.8)', 8 + x, 8 - hh, 1, hh * 2 + 1);
+      if (hh > 2) R('rgba(150,185,208,0.4)', 8 + x, 8 + Math.floor(hh / 2), 1, Math.ceil(hh / 2));
+    }
+    for (let i = 0; i < 8; i++) R('rgba(18,36,62,0.8)', i, 8 + (i % 2), 1, 1);
+    R('rgba(18,36,62,0.8)', 26, 5, 3, 2); R('rgba(18,36,62,0.8)', 26, 10, 3, 2);
+    R('#e9f6ff', 25, 8, 1, 1);
+  });
+const mantaA = mantaFrame(0);
+const mantaB = mantaFrame(2);
+const mantaAL = flipped(mantaA);
+const mantaBL = flipped(mantaB);
 
 const boat = sprite(44, 26, (R) => {
   const NAVY = '#14263d';
@@ -125,7 +261,18 @@ function makeChunk(ci) {
     if (m < 50) continue;
     const d = dir();
     if (m < 1500) {
-      if (rand() < 0.6) {
+      const rare = rand();
+      if (m < 160 && rare < 0.35) {
+        const cnt = 3 + Math.floor(rand() * 4);
+        const fx = rand();
+        const sp = (5 + rand() * 6) * d;
+        const kind = ['reefOrange', 'reefBlue', 'reefYellow'][Math.floor(rand() * 3)];
+        for (let j = 0; j < cnt; j++) creatures.push({ kind, wy: wy + (rand() - 0.5) * 26, fx: fx + j * 0.02, sp, ph: rand() * 6 });
+      } else if (m < 700 && rare < 0.45) creatures.push({ kind: 'turtle', wy, fx: rand(), sp: (3 + rand() * 2) * d, ph: rand() * 6 });
+      else if (m >= 200 && rare < 0.52) creatures.push({ kind: 'manta', wy, fx: rand(), sp: (4 + rand() * 3) * d, ph: rand() * 6 });
+      else if (m >= 300 && rare < 0.58) creatures.push({ kind: 'shark', wy, fx: rand(), sp: (7 + rand() * 4) * d, ph: rand() * 6 });
+      else if (m >= 250 && m < 1400 && rare < 0.62) creatures.push({ kind: 'wreck', wy, fx: 0.2 + rand() * 0.55, sp: 0, ph: 0 });
+      else if (rand() < 0.6) {
         const cnt = 4 + Math.floor(rand() * 5);
         const fx = rand();
         const sp = (6 + rand() * 8) * d;
@@ -134,7 +281,10 @@ function makeChunk(ci) {
         }
       } else creatures.push({ kind: 'fishM', wy, fx: rand(), sp: (5 + rand() * 6) * d, ph: rand() * 6 });
     } else if (m < 3600) {
-      creatures.push(rand() < 0.3
+      const rr = rand();
+      if (rr < 0.1) creatures.push({ kind: 'whale', wy, fx: rand(), sp: (2 + rand() * 1.5) * d, ph: rand() * 6 });
+      else if (rr < 0.22) creatures.push({ kind: 'squid', wy, fx: rand(), sp: 3 * d, ph: rand() * 6 });
+      else creatures.push(rand() < 0.3
         ? { kind: 'jellyCyan', wy, fx: rand(), sp: 2 * d, ph: rand() * 6 }
         : { kind: 'fishM', wy, fx: rand(), sp: (4 + rand() * 5) * d, ph: rand() * 6 });
     } else if (m < 10000) {
@@ -250,7 +400,7 @@ export function createScene(canvas, { onFrame } = {}) {
     const camY = camOf(shown);
     const [kx, ky] = krillPos(camY, lastNow / 1000);
     for (let i = 0; i < 22; i++) {
-      bubbles.push({ x: kx + (Math.random() - 0.5) * 10, wy: ky + camY + (Math.random() - 0.5) * 6, vy: 14 + Math.random() * 28, r: Math.random() < 0.3 ? 2 : 1, age: 0 });
+      bubbles.push({ x: kx + 7 + (Math.random() - 0.5) * 14, wy: ky + camY + 3 + (Math.random() - 0.5) * 8, vy: 14 + Math.random() * 28, r: Math.random() < 0.18 ? 3 : Math.random() < 0.4 ? 2 : 1, age: 0, wob: 1 + Math.random() * 1.6 });
     }
   }
 
@@ -291,6 +441,30 @@ export function createScene(canvas, { onFrame } = {}) {
         disc('rgba(110,225,255,0.07)', x + 9, by + 6, 14);
         break;
       }
+      case 'turtle': ctx.drawImage(right ? turtleR : turtleL, x, y + Math.round(Math.sin(t * 1.4 + c.ph) * 2)); break;
+      case 'shark': ctx.drawImage(right ? sharkR : sharkL, x, y); break;
+      case 'whale': ctx.drawImage(right ? whaleR : whaleL, x, y + Math.round(Math.sin(t * 0.5 + c.ph) * 3)); break;
+      case 'manta': {
+        const flapPhase = Math.floor(t * 2.2 + c.ph) % 2;
+        ctx.drawImage(right ? (flapPhase ? mantaB : mantaA) : (flapPhase ? mantaBL : mantaAL), x, y);
+        break;
+      }
+      case 'squid': {
+        const pulse = Math.round(Math.sin(t * 2 + c.ph) * 3);
+        ctx.drawImage(squid, x, y + pulse);
+        disc('rgba(255,233,168,0.06)', x + 5, y + 6 + pulse, 8);
+        break;
+      }
+      case 'wreck': {
+        const wx = Math.round(c.fx * W);
+        ctx.drawImage(wreck, wx, y);
+        const a = 0.35 + 0.25 * Math.sin(t * 1.3 + c.ph);
+        disc(`rgba(255,207,106,${(0.05 + a * 0.05).toFixed(3)})`, wx + 29, y + 12, 9);
+        break;
+      }
+      case 'reefOrange': ctx.drawImage(right ? reefOrange : reefOrangeL, x, y); break;
+      case 'reefBlue': ctx.drawImage(right ? reefBlue : reefBlueL, x, y); break;
+      case 'reefYellow': ctx.drawImage(right ? reefYellow : reefYellowL, x, y); break;
       case 'angler': {
         ctx.drawImage(right ? anglerR : anglerL, x, y);
         const lx = right ? x + 18 : x + 1;
@@ -328,6 +502,23 @@ export function createScene(canvas, { onFrame } = {}) {
     // niebo
     if (surfaceY > 0) {
       for (let y = 0; y < surfaceY; y += 3) fill(css(mix(SKY_TOP, SKY_LOW, y / surfaceY)), 0, y, W, 3);
+      // słońce z poświatą i mewy
+      const sunX = Math.round(W * 0.8);
+      const sunY = Math.min(surfaceY - 22, 42 - camY * 0.6 + 40);
+      if (sunY > 4) {
+        disc('rgba(255,244,200,0.10)', sunX, sunY, 34);
+        disc('rgba(255,244,200,0.18)', sunX, sunY, 22);
+        disc('rgba(255,248,215,0.55)', sunX, sunY, 12);
+        disc('#fffbe6', sunX, sunY, 8);
+      }
+      for (let g = 0; g < 3; g++) {
+        const gx = (((g * 173 + t * (9 + g * 3)) % (W + 40)) + W + 40) % (W + 40) - 20;
+        const gy = surfaceY - 30 - g * 16 + Math.round(Math.sin(t * 1.6 + g) * 2);
+        if (gy < 4) continue;
+        const wing = Math.sin(t * 5 + g * 2) > 0 ? 1 : 0;
+        fill('rgba(40,60,80,0.8)', gx, gy + wing, 2, 1); fill('rgba(40,60,80,0.8)', gx + 2, gy + 1 - wing, 2, 1);
+        fill('rgba(40,60,80,0.8)', gx + 4, gy + wing, 2, 1);
+      }
       for (const c of stat.clouds) {
         const cy = c.wy - camY;
         if (cy < -8 || cy > surfaceY) continue;
@@ -351,6 +542,19 @@ export function createScene(canvas, { onFrame } = {}) {
       }
     }
 
+    // refleksy światła tańczące pod powierzchnią (znikają z głębokością)
+    if (!reduce) {
+      for (let i = 0; i < 60; i++) {
+        const base = Math.max(0, surfaceY);
+        const wy = base + 4 + ((i * 53) % 150);
+        const m = (camY + wy) / K;
+        if (m > 180 || wy > H) continue;
+        const px = (((i * 97 + t * (4 + (i % 5))) % W) + W) % W;
+        const a = (0.12 * (1 - m / 180) * (0.5 + 0.5 * Math.sin(t * 2.2 + i))).toFixed(3);
+        fill(`rgba(230,250,255,${a})`, px, wy, 3 + (i % 3), 1);
+      }
+    }
+
     // zawartość kawałków świata widocznych na ekranie
     const ciMin = Math.max(0, Math.floor(camY / CH) - 1);
     const ciMax = Math.floor((camY + H) / CH) + 1;
@@ -370,10 +574,12 @@ export function createScene(canvas, { onFrame } = {}) {
     // linka i haczyk z krylem
     const [kx, ky] = krillPos(camY, t);
     const lineTop = Math.max(0, surfaceY);
-    fill('rgba(235,245,255,0.55)', kx + 4, lineTop, 1, Math.max(0, ky - lineTop - 2));
-    disc('rgba(255,92,122,0.08)', kx + 4, ky + 3, 10);
-    disc('rgba(255,92,122,0.12)', kx + 4, ky + 3, 6);
-    ctx.drawImage(krill, kx, ky);
+    fill('rgba(235,245,255,0.55)', kx + 7, lineTop, 1, Math.max(0, ky - lineTop - 2));
+    disc('rgba(255,92,122,0.08)', kx + 7, ky + 5, 13);
+    disc('rgba(255,92,122,0.12)', kx + 7, ky + 5, 8);
+    // nóżki i ogon: szybciej przy zjeździe
+    const flap = Math.floor(t * (5 + f * 9)) % 2;
+    ctx.drawImage(flap ? krillB : krillA, kx, ky);
 
     // pierścienie sonaru (brak echa)
     for (let i = pings.length - 1; i >= 0; i--) {
@@ -386,7 +592,7 @@ export function createScene(canvas, { onFrame } = {}) {
       const steps = Math.max(24, Math.floor(r * 3));
       for (let k = 0; k < steps; k++) {
         const ang = (k / steps) * Math.PI * 2;
-        fill(`rgba(160,235,255,${a})`, kx + 4 + Math.cos(ang) * r, ky + 3 + Math.sin(ang) * r, 1, 1);
+        fill(`rgba(160,235,255,${a})`, kx + 7 + Math.cos(ang) * r, ky + 5 + Math.sin(ang) * r, 1, 1);
       }
     }
 
@@ -397,7 +603,8 @@ export function createScene(canvas, { onFrame } = {}) {
         nextBubble = 0.4 - f * 0.36;
         const burstN = f > 0.3 ? 2 : 1;
         for (let b = 0; b < burstN; b++) {
-          bubbles.push({ x: kx + 1 + Math.random() * 6, wy: ky + camY - 2, vy: 10 + Math.random() * 10 + f * 60, r: f > 0.5 && Math.random() < 0.3 ? 2 : 1, age: 0 });
+          const big = Math.random();
+          bubbles.push({ x: kx + 3 + Math.random() * 9, wy: ky + camY - 2, vy: 10 + Math.random() * 10 + f * 60, r: big < 0.07 + f * 0.1 ? 3 : big < 0.3 + f * 0.25 ? 2 : 1, age: 0, wob: 1 + Math.random() * 1.6 });
         }
       }
     }
@@ -407,11 +614,24 @@ export function createScene(canvas, { onFrame } = {}) {
       b.age += dt;
       const by = b.wy - camY;
       if (by < surfaceY || by > H + 40 || b.age > 7) { bubbles.splice(i, 1); continue; }
-      const bx = b.x + Math.sin(b.age * 3 + i) * 1.5;
-      if (b.r === 1) fill('rgba(200,238,255,0.55)', bx, by, 2, 2);
-      else {
+      const bx = Math.round(b.x + Math.sin(b.age * 3 + i) * (b.wob ?? 1.5));
+      const byr = Math.round(by);
+      // bąbelek rośnie w drodze do góry (rozprężanie), a tuż pod powierzchnią pęka
+      const size = b.r + (b.age > 2.4 && b.r < 3 ? 1 : 0);
+      const nearTop = by - surfaceY < 6;
+      if (nearTop) { fill('rgba(220,245,255,0.5)', bx - 1, byr, 1, 1); fill('rgba(220,245,255,0.5)', bx + 2, byr, 1, 1); continue; }
+      if (size === 1) fill('rgba(200,238,255,0.6)', bx, byr, 2, 2);
+      else if (size === 2) {
+        const col = 'rgba(200,238,255,0.55)';
+        fill(col, bx + 1, byr, 2, 1); fill(col, bx + 1, byr + 3, 2, 1); fill(col, bx, byr + 1, 1, 2); fill(col, bx + 3, byr + 1, 1, 2);
+        fill('rgba(255,255,255,0.9)', bx + 1, byr + 1, 1, 1);
+      } else {
         const col = 'rgba(200,238,255,0.5)';
-        fill(col, bx + 1, by, 2, 1); fill(col, bx + 1, by + 3, 2, 1); fill(col, bx, by + 1, 1, 2); fill(col, bx + 3, by + 1, 1, 2);
+        fill(col, bx + 2, byr, 2, 1); fill(col, bx + 2, byr + 5, 2, 1);
+        fill(col, bx + 1, byr + 1, 1, 1); fill(col, bx + 4, byr + 1, 1, 1); fill(col, bx + 1, byr + 4, 1, 1); fill(col, bx + 4, byr + 4, 1, 1);
+        fill(col, bx, byr + 2, 1, 2); fill(col, bx + 5, byr + 2, 1, 2);
+        fill('rgba(255,255,255,0.95)', bx + 2, byr + 1, 2, 1); fill('rgba(255,255,255,0.8)', bx + 1, byr + 2, 1, 1);
+        fill('rgba(120,200,230,0.18)', bx + 1, byr + 2, 4, 3);
       }
     }
 
@@ -443,6 +663,20 @@ export function createScene(canvas, { onFrame } = {}) {
     if (surfaceY > -30 && surfaceY < H + 30) {
       const bob = Math.round(Math.sin(t * 1.1) * 1);
       ctx.drawImage(boat, Math.round(kx - 22 + 4), surfaceY - 20 + bob);
+      if (!reduce) {
+        // pływające kępy sargassum z zwisającymi pędami
+        for (let c = 0; c < 5; c++) {
+          const cx = Math.round((((c * 211 + 80 + t * 1.2) % (W + 60)) + W + 60) % (W + 60) - 30);
+          fill('rgba(110,120,40,0.9)', cx, surfaceY - 1, 9 + (c % 3) * 3, 2);
+          fill('rgba(150,165,60,0.9)', cx + 2, surfaceY - 2, 5, 1);
+          for (let k = 0; k < 4; k++) {
+            const len = 8 + ((c * 7 + k * 5) % 14);
+            for (let j = 0; j < len; j += 2) {
+              fill(`rgba(96,${110 + j * 2},46,${(0.85 - j / (len * 1.6)).toFixed(2)})`, cx + 1 + k * 3 + Math.round(Math.sin(t * 1.5 + j * 0.5 + k + c) * 1.4), surfaceY + 1 + j, 1, 2);
+            }
+          }
+        }
+      }
       for (let x = 0; x < W; x++) {
         const yy = surfaceY + Math.round(Math.sin(x * 0.22 + t * 1.4));
         fill('#bfeef0', x, yy, 1, 1);
