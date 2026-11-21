@@ -319,7 +319,7 @@ test('znany zespół w pytaniu o solistę dostaje wskazówkę bez dodawania do k
   assert.equal(correct.json.result?.shown, 'Anita Lipnicka');
 });
 
-test('Gemini przyjmuje brakujące hasło z dopasowanym źródłem bez zatrzymywania gry', async (t) => {
+test('Gemini zatrzymuje zegar i automatycznie przyjmuje hasło po potwierdzeniu', async (t) => {
   const env = setup({ GEMINI_API_KEY: 'klucz-do-mocka' });
   const token = tok(9);
   const word = 'Próbna Rzeczka';
@@ -333,6 +333,7 @@ test('Gemini przyjmuje brakujące hasło z dopasowanym źródłem bez zatrzymywa
   for (let i = 0; i < 14; i++) {
     recordCheck.run(`wczesniejsza odpowiedz ${i}`, T0, original.json.runId);
   }
+  const gemini = Promise.withResolvers();
   t.mock.method(globalThis, 'fetch', async (url, init) => {
     if (url.includes('/search/page?')) {
       return Response.json({ pages: [{ key: 'Probna_Rzeczka', title: word }] });
@@ -341,26 +342,72 @@ test('Gemini przyjmuje brakujące hasło z dopasowanym źródłem bez zatrzymywa
     assert.match(url, /^https:\/\/generativelanguage\.googleapis\.com\//);
     assert.equal(init.headers['x-goog-api-key'], 'klucz-do-mocka');
     assert.ok(!init.body.includes(token));
+    await gemini.promise;
     return Response.json({ candidates: [{ content: { parts: [
       { text: JSON.stringify({ verified: true, answer: word, rarity: 3, source: 1 }) },
     ] } }] });
   });
   const checks = [];
-  const submit = (answer = word) => handle(new Request('https://glebia.test/api/answer', { method: 'POST',
-    body: JSON.stringify({ token, runId: original.json.runId, idx: 0, answer }) }),
-  env, T0 + 6000, { waitUntil: (job) => checks.push(job) });
-  const pending = await (await submit()).json();
+  const runId = original.json.runId;
+  const submittedAt = T0 + INTRO_MS + LIMIT_MS - 500;
+  const submit = (body, now) => handle(new Request('https://glebia.test/api/answer', { method: 'POST',
+    body: JSON.stringify({ token, runId, ...body }) }),
+  env, now, { waitUntil: (job) => checks.push(job) });
+  const pending = await (await submit({ idx: 0, answer: word }, submittedAt)).json();
   assert.equal(pending.noEcho, true);
   assert.equal(pending.aiChecking, true);
+  assert.equal(pending.remainingMs, 500);
+
+  const late = submittedAt + 12_000;
+  const resumed = await call(env, 'POST', '/api/prompt', { body: { token, runId }, now: late });
+  assert.equal(resumed.json.idx, 0);
+  assert.equal(resumed.json.aiChecking, true);
+  assert.equal(resumed.json.remainingMs, 500);
+  const polling = await (await submit({ idx: 0, aiPoll: true }, late)).json();
+  assert.equal(polling.aiChecking, true);
+  assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM answers').get().n, 0);
+
+  gemini.resolve();
   await Promise.all(checks);
-  const limited = await (await submit('Inna nieznana rzeczka')).json();
-  assert.equal(limited.aiChecking, false);
-  assert.equal(limited.aiLimit, true);
-  const accepted = await (await submit()).json();
+  const accepted = await (await submit({ idx: 0, aiPoll: true }, late)).json();
   assert.equal(accepted.result.shown, word);
   assert.equal(accepted.result.source, 'https://pl.wikipedia.org/wiki/Probna_Rzeczka');
+  assert.equal(accepted.result.ms, LIMIT_MS - 500);
+  assert.equal(accepted.state.idx, 1);
+  await call(env, 'POST', '/api/prompt', { body: { token, runId }, now: late });
+  const limited = await (await submit({ idx: 1, answer: 'Inna nieznana odpowiedź' }, late + 6000)).json();
+  assert.equal(limited.aiChecking, false);
+  assert.equal(limited.aiLimit, true);
   assert.equal(checks.length, 1);
   assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM ai_answer_checks').get().n, 15);
+});
+
+test('bez potwierdzenia Gemini gracz odzyskuje pozostały czas i może odpowiedzieć ponownie', async (t) => {
+  const env = setup({ GEMINI_API_KEY: 'test' });
+  const token = tok(11);
+  const ids = ['rzeka', ...PROMPTS.filter((p) => p.id !== 'rzeka').slice(0, 6).map((p) => p.id)];
+  env.DB.raw.prepare('INSERT INTO days (day, prompts) VALUES (?, ?)').run(DAY, JSON.stringify(ids));
+  const { json: run } = await call(env, 'POST', '/api/run', { body: { token, name: 'Test' } });
+  const runId = run.runId;
+  await call(env, 'POST', '/api/prompt', { body: { token, runId } });
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ pages: [] }));
+  const checks = [];
+  const submittedAt = T0 + INTRO_MS + LIMIT_MS - 1200;
+  const request = new Request('https://glebia.test/api/answer', { method: 'POST',
+    body: JSON.stringify({ token, runId, idx: 0, answer: 'Nieznany strumień' }) });
+  const pending = await (await handle(request, env, submittedAt, { waitUntil: (job) => checks.push(job) })).json();
+  assert.equal(pending.remainingMs, 1200);
+  await Promise.all(checks);
+  const later = submittedAt + 5000;
+  const poll = { token, runId, idx: 0, aiPoll: true };
+  const done = await call(env, 'POST', '/api/answer', { body: poll, now: later });
+  assert.equal(done.json.aiFinished, true);
+  assert.equal(done.json.remainingMs, 1200);
+  const again = await call(env, 'POST', '/api/answer', { body: poll, now: later + 200 });
+  assert.equal(again.json.remainingMs, 1000, 'kolejne sprawdzenie nie powinno ponownie zatrzymywać zegara');
+  const answer = await call(env, 'POST', '/api/answer', { body: { token, runId, idx: 0, answer: 'Wisła' }, now: later + 1000 });
+  assert.equal(answer.json.result.shown, 'Wisła');
+  assert.equal(answer.json.result.ms, LIMIT_MS - 200);
 });
 
 test('wznowienie biegu rankingowego nie zużywa podejścia ani nie zmienia pseudonimu', async () => {
@@ -437,6 +484,43 @@ test('tryb swobodny: dowolnie wiele gier, losowe pytania, bez rankingu', async (
   const daily = await call(env, 'POST', '/api/run', { body: { token: tok(1), name: 'Luzak' }, now: T0 + 60_000 });
   assert.equal(daily.json.mode, 'daily');
   assert.equal(daily.json.idx, 0);
+});
+
+test('bonus Izaka ma stałe 100 000 punktów i może wypaść tylko w trybie swobodnym', async (t) => {
+  const env = setup();
+  const token = tok(1);
+  const bonusId = 'bonus_izak';
+  let random = 1 / 100_000;
+  t.mock.method(Math, 'random', () => random);
+  const start = () => call(env, 'POST', '/api/run', { body: { ...FREE, token, fresh: true } });
+  const { json: regularRun } = await start();
+  const stored = env.DB.raw.prepare('SELECT prompts FROM runs WHERE id = ?');
+  assert.ok(!JSON.parse(stored.get(regularRun.runId).prompts).includes(bonusId));
+
+  random = 0;
+  const { json: run } = await start();
+  const ids = JSON.parse(stored.get(run.runId).prompts);
+  assert.equal(ids[0], bonusId);
+  assert.equal(new Set(ids).size, PROMPTS_PER_DAY);
+  const { json: prompt } = await call(env, 'POST', '/api/prompt', {
+    body: { ...FREE, token, runId: run.runId },
+  });
+  assert.match(prompt.text, /Najbardziej nielojalna osoba w Polsce/);
+  const submit = (answer) => call(env, 'POST', '/api/answer', {
+    body: { ...FREE, token, runId: run.runId, idx: 0, answer }, now: T0 + 6000,
+  });
+  assert.equal((await submit('inna osoba')).json.noEcho, true);
+  const { json: accepted } = await submit('izak');
+  assert.equal(accepted.result.points, 100_000);
+  assert.equal(accepted.state.points, 100_000);
+  assert.equal(accepted.state.history[0].shown, 'Izak');
+  assert.equal((await call(env, 'GET', '/api/leaderboard')).json.players, 0);
+
+  env.DB.raw.prepare('INSERT INTO days (day, prompts) VALUES (?, ?)').run(DAY, JSON.stringify(ids));
+  await call(env, 'POST', '/api/run', { body: { token, name: 'Ranking' } });
+  const ranked = await call(env, 'POST', '/api/prompt', { body: { token } });
+  assert.equal(ranked.status, 200);
+  assert.doesNotMatch(ranked.json.text, /żartobliwy bonus/);
 });
 
 test('tryb swobodny: odświeżenie wznawia niedokończoną grę, a fresh zaczyna nową', async () => {

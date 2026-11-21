@@ -32,8 +32,8 @@ function playerToken() {
 }
 const token = playerToken();
 
-async function api(method, path, body) {
-  const init = { method, headers: { 'x-player-token': token } };
+async function api(method, path, body, signal) {
+  const init = { method, headers: { 'x-player-token': token }, signal };
   if (body) {
     init.body = JSON.stringify({ token, mode, ...body });
     init.headers['content-type'] = 'application/json';
@@ -292,7 +292,9 @@ async function nextPrompt() {
 
 function showPrompt(p) {
   stopTimer();
+  $('ai-progress').hidden = true;
   submitting = false;
+  currentIdx = p.idx;
   show('play');
   renderHud(p.idx);
   $('play-prompt').textContent = p.text;
@@ -302,12 +304,25 @@ function showPrompt(p) {
   input.disabled = true;
   btn.disabled = true;
   setHint('Czas ruszy za chwilę. Przeczytaj pytanie.');
+  if (p.aiChecking) return submit(false, p);
+  startQuestionTimer(p);
+}
+
+function paintClock(remaining, paused = false) {
   const ring = $('ring');
-  const circ = 2 * Math.PI * 44;
-  const text = $('timer-text');
+  $('timer-text').textContent = String(Math.ceil(Math.max(0, remaining) / 1000));
+  ring.style.strokeDashoffset = String(2 * Math.PI * 44 * (1 - Math.max(0, remaining) / LIMIT_MS));
+  ring.classList.toggle('warn', remaining < 10000 && remaining >= 5000);
+  ring.classList.toggle('danger', remaining < 5000);
+  ring.closest('.timer').classList.toggle('urgent', !paused && remaining > 0 && remaining < 5000);
+}
+
+function startQuestionTimer(p, resumed = false) {
+  stopTimer();
+  const ring = $('ring');
   const t0 = performance.now();
   deadline = t0 + p.remainingMs;
-  let unlocked = false;
+  let unlocked = resumed;
   let lastTickSec = 0;
   $('ring').closest('.timer').classList.remove('urgent');
   const frame = () => {
@@ -316,38 +331,31 @@ function showPrompt(p) {
     const toStart = p.startsInMs - elapsed;
     const remaining = p.remainingMs - elapsed;
     if (toStart > 0) {
-      text.textContent = String(Math.ceil(toStart / 1000));
+      $('timer-text').textContent = String(Math.ceil(toStart / 1000));
       ring.style.strokeDashoffset = '0';
       ring.classList.remove('warn', 'danger');
       return;
     }
     if (!unlocked) {
       unlocked = true;
-      input.disabled = false;
-      btn.disabled = false;
-      input.focus();
+      $('answer').disabled = false;
+      $('answer-btn').disabled = false;
+      $('answer').focus();
       sfx.start();
       setHint('Wpisz odpowiedź i zatwierdź Enterem. Brak echa? Spróbuj jeszcze raz.');
     }
     if (remaining <= 0) {
       stopTimer();
-      $('ring').closest('.timer').classList.remove('urgent');
-      text.textContent = '0';
-      ring.style.strokeDashoffset = String(circ);
+      paintClock(0);
       submit(true);
       return;
     }
-    text.textContent = String(Math.ceil(remaining / 1000));
-    ring.style.strokeDashoffset = String(circ * (1 - remaining / LIMIT_MS));
-    ring.classList.toggle('warn', remaining < 10000 && remaining >= 5000);
-    ring.classList.toggle('danger', remaining < 5000);
-    $('ring').closest('.timer').classList.toggle('urgent', remaining < 5000);
+    paintClock(remaining);
     const sec = Math.ceil(remaining / 1000);
     if (sec <= 3 && sec !== lastTickSec) { lastTickSec = sec; sfx.tick(); }
   };
-  frame();
   tickTimer = setInterval(frame, 100);
-  currentIdx = p.idx;
+  frame();
 }
 let currentIdx = 0;
 let deadline = 0; // performance.now() chwili, w której kończy się czas na bieżące pytanie
@@ -383,19 +391,47 @@ async function settleAfterExpiry() {
   }
 }
 
-async function submit(auto = false) {
+async function submit(auto = false, resumedCheck = null) {
   if (submitting || restarting) return;
   submitting = true;
   if (auto) stopTimer();
   const input = $('answer');
   const answer = input.value;
+  const { runId } = state;
+  const idx = currentIdx;
+  const current = () => state?.runId === runId && currentIdx === idx && !restarting;
+  const progress = $('ai-progress');
   input.disabled = true;
   $('answer-btn').disabled = true;
   try {
-    const r = await api('POST', '/api/answer', { runId: state.runId, idx: currentIdx, answer });
+    let r = resumedCheck ?? await api('POST', '/api/answer', { runId, idx, answer });
+    if (!current()) return;
+    if (r.aiChecking) {
+      stopTimer();
+      paintClock(r.remainingMs, true);
+      setHint('Gemini sprawdza odpowiedź. Zegar jest zatrzymany.');
+      progress.hidden = false;
+      let failures = 0;
+      do {
+        await sleep(600);
+        if (!current()) return;
+        try {
+          r = await api('POST', '/api/answer', { runId, idx, aiPoll: true }, AbortSignal.timeout(4_000));
+          failures = 0;
+        } catch (e) {
+          if ((e.status !== 0 && e.status < 500) || ++failures >= 3) throw e;
+        }
+        if (!current()) return;
+      } while (r.aiChecking);
+      progress.hidden = true;
+    }
     if (r.noEcho) {
-      // Brak echa: to nie jest pudło, pytanie trwa dalej i można próbować ponownie.
-      if (auto || performance.now() >= deadline) return settleAfterExpiry();
+      if (r.aiFinished) {
+        if (r.remainingMs <= 0) return settleAfterExpiry();
+        startQuestionTimer({ startsInMs: 0, remainingMs: r.remainingMs }, true);
+      } else if (auto || performance.now() >= deadline) {
+        return settleAfterExpiry();
+      }
       submitting = false;
       input.disabled = false;
       $('answer-btn').disabled = false;
@@ -404,7 +440,7 @@ async function submit(auto = false) {
       if (r.empty) return setHint('Wpisz odpowiedź.', true);
       let hint = `Brak echa dla „${r.raw}”. Spróbuj jeszcze raz.`;
       if (r.categoryHint) hint = `„${r.raw}” pasuje do innej kategorii (${r.categoryHint}). Spróbuj jeszcze raz.`;
-      else if (r.aiChecking) hint = 'Gemini sprawdza odpowiedź. Możesz spróbować innej albo wrócić do tej za chwilę.';
+      else if (r.aiFinished) hint = 'Gemini nie potwierdził odpowiedzi. Spróbuj jeszcze raz.';
       else if (r.aiLimit) hint = 'Dzienny limit sprawdzeń Gemini jest wykorzystany. Spróbuj innej odpowiedzi.';
       setHint(hint, true);
       scene.ping();
@@ -418,6 +454,8 @@ async function submit(auto = false) {
     state = r.state;
     showReveal(r.result, auto);
   } catch (e) {
+    if (!current()) return;
+    progress.hidden = true;
     if (e.status === 409 && e.data?.state) {
       // Serwer już zamknął to pytanie (np. minął czas): pokaż zapisany wynik z historii.
       stopTimer();

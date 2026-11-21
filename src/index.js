@@ -22,12 +22,19 @@ import {
 
 const PROMPT_BY_ID = new Map(PROMPTS.map((p) => [p.id, p]));
 buildIndex(PROMPT_BY_ID.get('nazwisko')); // duży wykaz PESEL indeksujemy przy starcie Workera
+const FREE_BONUS_PROMPT = {
+  id: 'bonus_izak',
+  text: 'Najbardziej nielojalna osoba w Polsce (żartobliwy bonus)',
+  answers: [[1_000_000, 'Izak']],
+};
+PROMPT_BY_ID.set(FREE_BONUS_PROMPT.id, FREE_BONUS_PROMPT);
 const RELATED_CATEGORIES = new Map([
   ['piosenkarz', { id: 'zespol', label: 'zespół muzyczny' }],
   ['program', { id: 'serial', label: 'serial telewizyjny' }],
 ]);
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,64}$/;
 const MAX_BODY = 2048;
+const AI_WAIT_MS = 24_000;
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -69,6 +76,7 @@ async function playerHash(token) {
 // ---------- dostęp do danych ----------
 
 const POLISH_IDS = PROMPTS.map((p) => p.id);
+const FREE_IDS = [...POLISH_IDS, FREE_BONUS_PROMPT.id];
 const MAX_MISSES = 40; // prób "bez echa" na jedno pytanie
 const REVIEW_MIN_PLAYERS = 3;
 const MODES = new Set(['daily', 'free']);
@@ -88,19 +96,23 @@ async function dayPrompts(env, day) {
   return resolvePrompts(JSON.parse(row.prompts), POLISH_IDS);
 }
 
-function randomIds(ids) {
-  const pool = [...ids];
+function randomFreePromptIds() {
+  const pool = [...POLISH_IDS];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  return pool.slice(0, PROMPTS_PER_DAY);
+  const ids = pool.slice(0, PROMPTS_PER_DAY);
+  if (Math.random() < 1 / 100_000) {
+    ids[Math.floor(Math.random() * ids.length)] = FREE_BONUS_PROMPT.id;
+  }
+  return ids;
 }
 
 
 async function promptsOf(env, run) {
   if (!run.prompts) return dayPrompts(env, run.day);
-  return resolvePrompts(JSON.parse(run.prompts), POLISH_IDS);
+  return resolvePrompts(JSON.parse(run.prompts), run.mode === 'free' ? FREE_IDS : POLISH_IDS);
 }
 
 const getRun = (env, day, player) =>
@@ -193,22 +205,26 @@ async function commitAnswer(env, run, prompts, { raw, norm, key, meters, ms }) {
   const tier = depthBand(meters).tier;
   const nextIdx = run.idx + 1;
   const finished = nextIdx >= prompts.length ? 1 : 0;
-  await env.DB.batch([
+  const current = [run.id, run.idx, run.started_at, run.ai_wait_at];
+  const [inserted] = await env.DB.batch([
     env.DB.prepare(
       `INSERT INTO answers (run_id, idx, day, prompt_id, raw, norm, key, tier, meters, ms)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(run.id, run.idx, run.day, prompts[run.idx].id, raw, norm, key, tier, meters, ms),
+       SELECT id, idx, day, ?, ?, ?, ?, ?, ?, ? FROM runs
+       WHERE id = ? AND idx = ? AND started_at IS ? AND ai_wait_at IS ?`,
+    ).bind(prompts[run.idx].id, raw, norm, key, tier, meters, ms, ...current),
     env.DB.prepare(
-      `UPDATE runs SET idx = ?, started_at = NULL, meters = meters + ?, total_ms = total_ms + ?, finished = ?
-       WHERE id = ? AND idx = ?`,
-    ).bind(nextIdx, meters, ms, finished, run.id, run.idx),
+      `UPDATE runs SET idx = ?, started_at = NULL, meters = meters + ?, total_ms = total_ms + ?, finished = ?,
+         ai_wait_at = NULL, ai_wait_answer = NULL, ai_wait_done_at = NULL
+       WHERE id = ? AND idx = ? AND started_at IS ? AND ai_wait_at IS ?`,
+    ).bind(nextIdx, meters, ms, finished, ...current),
   ]);
+  if (inserted.meta.changes !== 1) throw new HttpError(409, 'Stan rozgrywki zmienił się');
 }
 
 /** Pytania, którym minął czas (np. po zamknięciu karty), zapisujemy jako puste i idziemy dalej. */
 async function settleExpired(env, runIn, prompts, now) {
   let run = runIn;
-  while (!run.finished && run.started_at != null && now > run.started_at + LIMIT_MS + GRACE_MS) {
+  while (!run.finished && run.ai_wait_at == null && run.started_at != null && now > run.started_at + LIMIT_MS + GRACE_MS) {
     try {
       await commitAnswer(env, run, prompts, { raw: '', norm: '', key: null, meters: 0, ms: LIMIT_MS });
     } catch {
@@ -217,6 +233,21 @@ async function settleExpired(env, runIn, prompts, now) {
     run = await getRunById(env, run.id);
   }
   return run;
+}
+
+const remainingTime = (run, now) => Math.max(0, run.started_at + LIMIT_MS - now);
+
+async function verifyPausedAnswer(env, runId, prompt, norm, now) {
+  const wallStart = Date.now();
+  try {
+    await checkWithGemini(env, prompt, norm, now);
+  } catch {
+    console.warn('Weryfikacja Gemini chwilowo niedostępna');
+  } finally {
+    const doneAt = now + Math.min(AI_WAIT_MS, Math.max(0, Date.now() - wallStart));
+    await env.DB.prepare('UPDATE runs SET ai_wait_done_at = ? WHERE id = ? AND ai_wait_at = ?')
+      .bind(doneAt, runId, now).run();
+  }
 }
 
 async function runState(env, run, prompts) {
@@ -280,7 +311,7 @@ async function handleRun(request, env, now) {
       const info = await env.DB.prepare(
         "INSERT INTO runs (day, mode, player, name, prompts, created_at) VALUES (?, ?, ?, ?, ?, ?)",
       )
-        .bind(mode, mode, player, name, JSON.stringify(randomIds(POLISH_IDS)), now)
+        .bind(mode, mode, player, name, JSON.stringify(randomFreePromptIds()), now)
         .run();
       run = await getRunById(env, info.meta.last_row_id);
     }
@@ -336,7 +367,8 @@ async function handlePrompt(request, env, now) {
     total: prompts.length,
     text: prompts[run.idx].text,
     startsInMs: Math.max(0, run.started_at - now),
-    remainingMs: Math.max(0, run.started_at + LIMIT_MS - now),
+    remainingMs: remainingTime(run, run.ai_wait_at ?? now),
+    aiChecking: run.ai_wait_at != null,
     depth: run.meters,
     points: pointsOf(run.meters),
   });
@@ -349,11 +381,20 @@ async function handleAnswer(request, env, now, ctx) {
     // Bieg poszedł dalej (np. minął czas): klient dostaje aktualny stan i pokazuje wynik z historii.
     throw new HttpError(409, 'Ta odpowiedź jest już nieaktualna', { state: await runState(env, run, prompts) });
   }
-  const raw = typeof body.answer === 'string' ? body.answer.slice(0, MAX_ANSWER_LEN) : '';
+  const waiting = run.ai_wait_at != null;
+  const answerTime = run.ai_wait_at ?? now;
+  if (waiting && run.ai_wait_done_at == null && now < answerTime + AI_WAIT_MS) {
+    return json({ noEcho: true, aiChecking: true, remainingMs: remainingTime(run, answerTime) });
+  }
+  if (body.aiPoll === true && !waiting) {
+    return json({ noEcho: true, aiFinished: true, remainingMs: remainingTime(run, now) });
+  }
+  const raw = waiting ? run.ai_wait_answer : typeof body.answer === 'string' ? body.answer.slice(0, MAX_ANSWER_LEN) : '';
   const prompt = prompts[run.idx];
   const norm = normalize(raw);
   if (!norm) return json({ noEcho: true, empty: true, tries: 0 });
-  const review = await env.DB.prepare(
+  const bonus = prompt === FREE_BONUS_PROMPT;
+  const review = bonus ? { extra: 0 } : await env.DB.prepare(
     `SELECT COUNT(*) AS extra, MAX(CASE WHEN norm = ? THEN display END) AS shown,
       MAX(CASE WHEN norm = ? THEN meters END) AS meters,
       MAX(CASE WHEN norm = ? THEN sources END) AS sources
@@ -364,6 +405,19 @@ async function handleAnswer(request, env, now, ctx) {
     : matchAnswer(prompt, raw);
 
   if (!match) {
+    if (waiting) {
+      const resumedAt = run.started_at + Math.min(AI_WAIT_MS, Math.max(0, now - answerTime));
+      const released = await env.DB.prepare(
+        `UPDATE runs SET started_at = ?, ai_wait_at = NULL, ai_wait_answer = NULL, ai_wait_done_at = NULL
+         WHERE id = ? AND idx = ? AND ai_wait_at = ?`,
+      ).bind(resumedAt, run.id, run.idx, answerTime).run();
+      if (released.meta.changes !== 1) {
+        const fresh = await getRunById(env, run.id);
+        throw new HttpError(409, 'Stan rozgrywki zmienił się', { state: await runState(env, fresh, prompts) });
+      }
+      return json({ noEcho: true, raw, aiFinished: true, remainingMs: remainingTime({ started_at: resumedAt }, now) });
+    }
+    if (bonus) return json({ noEcho: true, raw });
     const related = RELATED_CATEGORIES.get(prompt.id);
     if (related && buildIndex(PROMPT_BY_ID.get(related.id)).map.has(norm)) {
       return json({ noEcho: true, raw, categoryHint: related.label });
@@ -377,20 +431,32 @@ async function handleAnswer(request, env, now, ctx) {
       .bind(run.id, run.idx, prompt.id, raw, norm, now)
       .run();
     const aiStatus = env.GEMINI_API_KEY && ctx && await reserveAiCheck(env, run.player, prompt.id, norm, raw, now);
-    const aiChecking = aiStatus === 'checking';
-    if (aiChecking) {
-      ctx.waitUntil(checkWithGemini(env, prompt, norm, now).catch(() => {
-        console.warn('Weryfikacja Gemini chwilowo niedostępna');
-      }));
+    if (aiStatus === 'checking') {
+      const paused = await env.DB.prepare(
+        `UPDATE runs SET ai_wait_at = ?, ai_wait_answer = ?
+         WHERE id = ? AND idx = ? AND started_at = ? AND ai_wait_at IS NULL`,
+      ).bind(now, raw, run.id, run.idx, run.started_at).run();
+      if (paused.meta.changes === 1) {
+        ctx.waitUntil(verifyPausedAnswer(env, run.id, prompt, norm, now));
+        return json({ noEcho: true, raw, aiChecking: true, remainingMs: remainingTime(run, now) });
+      }
+      const fresh = await getRunById(env, run.id);
+      if (fresh.idx === run.idx && fresh.ai_wait_at != null) {
+        return json({ noEcho: true, aiChecking: true, remainingMs: remainingTime(fresh, fresh.ai_wait_at) });
+      }
+      throw new HttpError(409, 'Stan rozgrywki zmienił się', { state: await runState(env, fresh, prompts) });
     }
-    return json({ noEcho: true, raw, tries: prev.n + 1, maxTries: MAX_MISSES, aiChecking, aiLimit: aiStatus === 'limit' });
+    return json({ noEcho: true, raw, tries: prev.n + 1, maxTries: MAX_MISSES, aiChecking: false, aiLimit: aiStatus === 'limit' });
   }
 
-  const pop = await popularity(env, prompt.id, now);
-  const meters = adjustMeters(match.meters, pop.counts.get(match.shown) ?? 0, pop.max, pop.total,
-    prompt.answers.length + review.extra);
-  const ms = Math.min(LIMIT_MS, Math.max(MIN_ANSWER_MS, now - run.started_at));
-  const share = await crowdShare(env, run.day, prompt.id, match.shown);
+  let meters = match.meters;
+  if (!bonus) {
+    const pop = await popularity(env, prompt.id, now);
+    meters = adjustMeters(meters, pop.counts.get(match.shown) ?? 0, pop.max, pop.total,
+      prompt.answers.length + review.extra);
+  }
+  const ms = Math.min(LIMIT_MS, Math.max(MIN_ANSWER_MS, answerTime - run.started_at));
+  const share = bonus ? null : await crowdShare(env, run.day, prompt.id, match.shown);
   try {
     await commitAnswer(env, run, prompts, { raw, norm: match.norm, key: match.shown, meters, ms });
   } catch {
@@ -483,7 +549,7 @@ async function handleReview(request, env, now) {
   const prompt = PROMPT_BY_ID.get(promptId);
   const display = typeof answer === 'string' ? answer.trim() : '';
   const norm = normalize(display);
-  if (!prompt || !norm || display.length > MAX_ANSWER_LEN || /[\p{Cc}\p{Cf}]/u.test(display)) {
+  if (!prompt || prompt === FREE_BONUS_PROMPT || !norm || display.length > MAX_ANSWER_LEN || /[\p{Cc}\p{Cf}]/u.test(display)) {
     throw new HttpError(400, 'Podaj poprawną kategorię i odpowiedź z kolejki');
   }
   const approve = decision === 'approve';

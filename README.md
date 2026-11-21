@@ -42,7 +42,7 @@ Wersje wranglera i `compatibility_date` w `wrangler.toml` nie były tu sprawdzan
 
 Baza rośnie razem z graczami. Po trzech różnych tokenach graczy odpowiedź bez echa pojawia się z kategorią w panelu `/admin.html`. Zaloguj się tokenem `ADMIN_TOKEN` i zatwierdź odpowiedź z głębokością bazową albo odrzuć zgłoszenie. Decyzje są w D1 i działają od razu. Redakcyjne wpisy i nowe kategorie dodaje się w `src/content/`.
 
-Opcjonalny sekret `GEMINI_API_KEY` włącza sprawdzanie automatyczne. Polion szuka pasującego artykułu w polskiej Wikipedii, a Gemini ocenia kategorię i bazową rzadkość na podstawie jego wstępu. Przy zatwierdzeniu zapisujemy odpowiedź, głębokość i adres źródła. Limit to 5 sprawdzeń na token gracza i 50 dla całej gry w ciągu 24 godzin. W razie braku potwierdzenia działa zwykła kolejka.
+Opcjonalny sekret `GEMINI_API_KEY` włącza sprawdzanie automatyczne. Polion zatrzymuje zegar i szuka pasującego artykułu w polskiej Wikipedii, a Gemini ocenia kategorię i bazową rzadkość na podstawie jego wstępu. Gra automatycznie zalicza potwierdzoną odpowiedź i zapisuje głębokość oraz adres źródła. Jeśli zabraknie potwierdzenia, można próbować dalej z zachowanym czasem, a odpowiedź trafia do kolejki. Limit to 15 sprawdzeń na gracza i 50 dla całej gry w ciągu 24 godzin.
 
 ## Struktura
 
