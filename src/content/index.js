@@ -14,11 +14,13 @@ import uzupLudzie from './uzup-ludzie.js';
 import uzupReszta from './uzup-reszta.js';
 import uzupNet from './uzup-net.js';
 import uzupMasa from './uzup-masa.js';
+import uzupMasa2 from './uzup-masa2.js';
+import uzupMasa3 from './uzup-masa3.js';
 import { normalize } from '../game.js';
 
 // Id kategorii nigdy nie usuwamy ani nie zmieniamy: zapisane dni w bazie wskazują na nie po id.
 const uzupelnienia = {};
-for (const part of [uzupelnieniaPodstawowe, uzupPrzyroda, uzupKultura, uzupLudzie, uzupReszta, uzupNet, uzupMasa]) {
+for (const part of [uzupelnieniaPodstawowe, uzupPrzyroda, uzupKultura, uzupLudzie, uzupReszta, uzupNet, uzupMasa, uzupMasa2, uzupMasa3]) {
   for (const [id, list] of Object.entries(part)) uzupelnienia[id] = [...(uzupelnienia[id] ?? []), ...list];
 }
 
