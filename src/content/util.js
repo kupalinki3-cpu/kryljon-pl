@@ -1,3 +1,5 @@
+import { normalize } from '../game.js';
+
 // Pomocnicze funkcje do zapisu treści. Wpis w kategorii: [metry, "nazwa", ...aliasy].
 const fnv = (s) => {
   let h = 0x811c9dc5;
@@ -18,4 +20,15 @@ export const group = (base, ...items) =>
     return [jit(base, a[0]), ...a];
   });
 
-export const cat = (id, text, ...groups) => ({ id, text, answers: groups.flat() });
+/** Kategoria. Późniejszy wpis, którego nazwa już wystąpiła wcześniej (po normalizacji), jest pomijany. */
+export const cat = (id, text, ...groups) => {
+  const seen = new Set();
+  const answers = [];
+  for (const entry of groups.flat()) {
+    const keys = entry.slice(1).map(normalize);
+    if (keys.some((k) => seen.has(k))) continue;
+    keys.forEach((k) => seen.add(k));
+    answers.push(entry);
+  }
+  return { id, text, answers };
+};
