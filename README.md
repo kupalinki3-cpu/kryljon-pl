@@ -46,7 +46,7 @@ Baza jest punktem startowym i rośnie razem z graczami: nie zna wszystkiego, co 
 
 - `src/game.js` – czysta logika (normalizacja, dopasowanie, daty, losowanie)
 - `src/index.js` – API Workera
-- `src/content/` – 48 kategorii, ok. 2970 wpisów (nauka, przyroda, geografia, miejsca, kultura, ludzie, sport i szkoła, internet)
+- `src/content/` – 60 kategorii, ok. 7200 wpisów (nauka, przyroda, geografia, miejsca, kultura, ludzie, sport i szkoła, internet)
 - `migrations/` – `0001_init.sql` (schemat D1), `0002_modes_meters.sql` (tryby, metry, tabela `misses`), `0003_popularity_index.sql` (indeks pod rzadkość dynamiczną)
 - `public/` – front: `scene.js` (pikselartowe morze na canvasie), `app.js` (logika), `style.css`, `index.html`. Czcionka Pixelify Sans ładuje się z Google Fonts, bez sieci wchodzi monospace
 - `test/` – testy (`d1shim.js` emuluje D1 na `node:sqlite`)
