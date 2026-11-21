@@ -3,6 +3,33 @@
 import { group } from './util.js';
 
 export default {
+  miasto: [
+    ...group(500, 'Wodzisław Śląski', 'Chrzanów', 'Olkusz', 'Myślenice', 'Brzeg', 'Brodnica', 'Świecie', 'Kętrzyn', 'Bartoszyce', 'Szczecinek', 'Nowa Sól', 'Wałcz', 'Żary',
+      'Żagań', 'Lębork', 'Kościerzyna', 'Puck', 'Reda', 'Goleniów', 'Police', 'Gubin', 'Słubice', 'Kostrzyn nad Odrą', 'Jarocin', 'Krotoszyn', 'Rawicz', 'Sochaczew', 'Wyszków',
+      'Pułtusk', 'Końskie', 'Opoczno', 'Jędrzejów', 'Kraśnik', 'Mikołajki', 'Złotów', 'Wągrowiec', 'Słupca', 'Kępno', 'Pleszew', 'Chodzież', 'Czarnków', 'Białogard', 'Świebodzin',
+      'Sulechów', 'Choszczno', 'Myślibórz', 'Człuchów', 'Bytów', 'Chełmno', 'Prudnik', 'Pińczów', 'Włodawa', 'Lubartów', 'Międzychód', ['Środa Wielkopolska', 'Środa Wlkp'],
+      'Tomaszów Lubelski', ['Nowy Dwór Gdański'], ['Krosno Odrzańskie'], ['Drawsko Pomorskie'], ['Radzyń Podlaski'], ['Pruszcz Gdański'], 'Busko-Zdrój', 'Nowy Tomyśl'),
+    ...group(1400, 'Strzelce Opolskie', 'Kluczbork', 'Namysłów', 'Oleśnica', 'Oława', 'Strzegom', 'Dzierżoniów', 'Bielawa', 'Ząbkowice Śląskie', 'Złotoryja', 'Lwówek Śląski', 'Bolesławiec',
+      'Lubań', 'Zgorzelec', 'Zawidów', 'Kamienna Góra', 'Nowa Ruda', 'Bystrzyca Kłodzka', 'Polanica-Zdrój', 'Duszniki-Zdrój', 'Lądek-Zdrój', 'Głuchołazy', 'Paczków', 'Otmuchów',
+      'Krapkowice', 'Prószków', 'Ozimek', 'Tarnowskie Góry', 'Lubliniec', 'Kalety', 'Blachownia', 'Myszków', 'Żarki', 'Pszczyna', 'Czechowice-Dziedzice', 'Cieszyn', 'Skoczów',
+      'Ustroń', 'Wisła', 'Żywiec', 'Węgierska Górka', 'Kęty', 'Wadowice', 'Andrychów', 'Sucha Beskidzka', 'Maków Podhalański', 'Nowy Targ', 'Czarny Dunajec', 'Bukowina Tatrzańska',
+      'Muszyna', 'Piwniczna-Zdrój', 'Stary Sącz', 'Grybów', 'Biecz', 'Jasło', 'Dukla', 'Rymanów', 'Iwonicz-Zdrój', 'Brzozów', 'Dynów', 'Leżajsk', 'Nisko', 'Rudnik nad Sanem',
+      'Przeworsk', 'Jarosław', 'Lubaczów', 'Ustrzyki Dolne', 'Lesko', 'Ulanów', 'Tarnobrzeg', 'Staszów', 'Opatów', 'Ostrowiec', 'Kazimierza Wielka', 'Skalbmierz', 'Proszowice',
+      'Brzesko', 'Dąbrowa Tarnowska', 'Tuchów', 'Ciężkowice', 'Zakliczyn', 'Radomyśl Wielki', 'Dębica', 'Ropczyce', 'Sędziszów Małopolski', 'Kolbuszowa', 'Głogów Małopolski',
+      'Łowicz', 'Rawa Mazowiecka', 'Zduńska Wola', 'Sieradz', 'Łask', 'Wieluń', 'Wieruszów', 'Poddębice', 'Aleksandrów Łódzki', 'Brzeziny', 'Koluszki', 'Rzgów', 'Opoczno',
+      'Przysucha', 'Szydłowiec', 'Zwoleń', 'Iłża', 'Lipsko', 'Kozienice', 'Garwolin', 'Łosice', 'Sokołów Podlaski', 'Węgrów', 'Wołomin', 'Zielonka', 'Marki', 'Ząbki', 'Radzymin',
+      'Nowy Dwór Mazowiecki', 'Płońsk', 'Sierpc', 'Gostynin', 'Żuromin', 'Przasnysz', 'Maków Mazowiecki', 'Różan', 'Ostrów Mazowiecka', 'Wysokie Mazowieckie', 'Zambrów',
+      'Grajewo', 'Szczuczyn', 'Mońki', 'Sokółka', 'Hajnówka', 'Bielsk Podlaski', 'Siemiatycze', 'Sejny', 'Gołdap', 'Olecko', 'Pisz', 'Orzysz', 'Węgorzewo', 'Mrągowo',
+      'Barczewo', 'Biskupiec', 'Reszel', 'Orneta', 'Frombork', 'Pasłęk', 'Morąg', 'Miłakowo', 'Dobre Miasto', 'Lubawa', 'Gniew', 'Skarszewy', 'Czersk', 'Chojnice', 'Tuchola',
+      'Koronowo', 'Nakło nad Notecią', 'Szubin', 'Żnin', 'Mogilno', 'Strzelno', 'Kruszwica', 'Radziejów', 'Aleksandrów Kujawski', 'Ciechocinek', 'Lipno', 'Rypin', 'Golub-Dobrzyń',
+      'Wąbrzeźno', 'Łasin', 'Górzno', 'Nowe Miasto Lubawskie', 'Ostrzeszów', 'Syców', 'Trzebnica', 'Wołów', 'Milicz', 'Żmigród', 'Polkowice', 'Chocianów', 'Prochowice',
+      'Szprotawa', 'Kożuchów', 'Nowogród Bobrzański', 'Zbąszynek', 'Skwierzyna', 'Strzelce Krajeńskie', 'Dębno', 'Barlinek', 'Pyrzyce', 'Gryfino', 'Nowogard', 'Łobez',
+      'Świdwin', 'Połczyn-Zdrój', 'Darłowo', 'Sławno', 'Rewal', 'Dziwnów', 'Międzyzdroje', 'Karwia', 'Jastarnia', 'Jastrzębia Góra', 'Krynica Morska', 'Sztutowo', 'Łeba', 'Ustka'),
+    ...group(3500, 'Pakość', 'Kcynia', 'Gołańcz', 'Margonin', 'Ujście', 'Trzcianka', 'Krzyż Wielkopolski', 'Sieraków', 'Lwówek', 'Pniewy', 'Zbąszyń', 'Zbąszyń', 'Rydzyna', 'Bojanowo',
+      'Jutrosin', 'Sulmierzyce', 'Kobylin', 'Koźmin Wielkopolski', 'Dolsk', 'Książ Wielkopolski', 'Miłosław', 'Nekla', 'Pobiedziska', 'Kostrzyn', 'Murowana Goślina', 'Oborniki',
+      'Rogoźno', 'Skoki', 'Kłecko', 'Witkowo', 'Trzemeszno', 'Orchowo', 'Pyzdry', 'Kleczew', 'Golina', 'Ślesin', 'Sompolno', 'Izbica Kujawska', 'Brześć Kujawski', 'Piotrków Kujawski',
+      'Lubraniec', 'Kowal', 'Bobrowniki', 'Dobrzyń nad Wisłą', 'Skępe', 'Zakrzewo', 'Tłuchowo', 'Szczutowo', 'Mochowo', 'Sierakowo'),
+  ],
   raper: [
     ...group(220, 'Paktofonika', 'Fisz Emade Tworzywo', ['Pięć Dwa Dubajtury', '52 Dębiec', 'Pięćdziesiąt dwa Dębiec'], 'Grammatik',
       ['Mezo', 'Mezo Rap'], 'Pono', 'Vienio', ['Waldemar Kasta', 'Kasta'], 'Onar', 'Pyskaty', 'Rahim', 'Tymek', 'Żabson', 'Sobota', 'Gural',
