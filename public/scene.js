@@ -75,6 +75,24 @@ function flipped(src) {
   });
 }
 
+function squidFrames(image) {
+  const art = artSprite(image, [118, 82, 1212, 964], 42, 33);
+  return Array.from({ length: 12 }, (_, i) => {
+    const phase = i / 12 * 2 * Math.PI;
+    const frame = sprite(art.width, art.height + 6, (_r, ctx) => {
+      for (let x = 0; x < art.width; x++) {
+        const u = x / (art.width - 1);
+        // Środek pozostaje stabilny, ruch narasta w stronę końcówek macek i płetw.
+        const arms = clamp01(1 - u / 0.45);
+        const fins = clamp01((u - 0.65) / 0.35);
+        const bend = 3 * arms * Math.sin(phase - 2 * arms) + 2 * fins * Math.sin(phase + 1.4);
+        ctx.drawImage(art, x, 0, 1, art.height, x, 3 + Math.round(bend), 1, art.height);
+      }
+    });
+    return { left: frame, right: flipped(frame) };
+  });
+}
+
 const SIL = 'rgba(2,10,24,0.42)';
 const fishS = sprite(8, 4, (R) => {
   R(SIL, 0, 0, 2, 1); R(SIL, 0, 3, 2, 1); R(SIL, 1, 1, 1, 2); R(SIL, 2, 1, 5, 2); R(SIL, 7, 1, 1, 2);
@@ -321,7 +339,7 @@ function makeChunk(ci) {
     } else if (m < 3600) {
       const rr = rand();
       if (rr < 0.1) creatures.push({ kind: 'whale', wy, fx: rand(), sp: (2 + rand() * 1.5) * d, ph: rand() * 6 });
-      else if (rr < 0.22) creatures.push({ kind: 'jellyCyan', wy, fx: rand(), sp: 3 * d, ph: rand() * 6 });
+      else if (rr < 0.22) creatures.push({ kind: 'squid', wy, fx: rand(), sp: 3 * d, ph: rand() * 6 });
       else creatures.push(rand() < 0.3
         ? { kind: 'jellyCyan', wy, fx: rand(), sp: 2 * d, ph: rand() * 6 }
         : { kind: 'fishM', wy, fx: rand(), sp: (4 + rand() * 5) * d, ph: rand() * 6 });
@@ -378,6 +396,7 @@ export function createScene(canvas, { onFrame } = {}) {
   let diveColor = DIVE_COLORS[0];
   let dirty = true;
   let krillArt, anglerArt, jellyArt, mantaArt, isopodArt, cave, surfaceArt, trawler;
+  let squidArt;
   const loadArt = (file, onLoad) => {
     const image = new Image();
     image.onload = () => { onLoad(image); dirty = true; };
@@ -387,6 +406,7 @@ export function createScene(canvas, { onFrame } = {}) {
     krillArt = artSprite(image, [0, 0, 24, 18], 24, 18);
   });
   loadArt('./art/powierzchnia-v2.png', (image) => { surfaceArt = image; });
+  loadArt('./art/kalamarnica.png', (image) => { squidArt = squidFrames(image); });
   loadArt('./art/glebiny-v2.png', (image) => { cave = image; });
   loadArt('./art/kuter-v2.png', (image) => {
     trawler = Array.from({ length: 4 }, (_, i) => artSprite(image, [i * 543, 156, 543, 398], 74, 54));
@@ -498,6 +518,13 @@ export function createScene(canvas, { onFrame } = {}) {
     const x = Math.round((((c.fx * span + t * c.sp) % span) + span) % span - 30);
     const right = c.sp > 0;
     switch (c.kind) {
+      case 'squid': {
+        if (!squidArt) break;
+        const pose = reduce ? 0 : Math.floor(t * 10 + c.ph) % squidArt.length;
+        const frame = squidArt[pose];
+        ctx.drawImage(right ? frame.right : frame.left, x, y);
+        break;
+      }
       case 'fishS': ctx.drawImage(right ? fishS : fishSL, x, y); break;
       case 'fishM': ctx.drawImage(right ? fishM : fishML, x, y); break;
       case 'jellyCyan': {
