@@ -242,16 +242,27 @@ const reefBlue = rowsSprite({ b: '#3a8dff', y: '#ffd44d', k: '#08142a' }, ['...b
 const reefYellow = rowsSprite({ y: '#ffd44d', b: '#2a1a05', k: '#251008' }, ['..yy...', '.yyyyy.', 'yybyyky', '.yyyyy.', '..yy...']);
 const reefOrangeL = flipped(reefOrange); const reefBlueL = flipped(reefBlue); const reefYellowL = flipped(reefYellow);
 const mantaFrame = (flap) =>
-  sprite(30, 17, (R) => {
-    for (let x = 0; x < 22; x++) {
-      const t = x / 21;
-      const hh = Math.round((7 + flap) * Math.sin(Math.PI * Math.pow(t, 0.85)));
-      R('rgba(18,36,62,0.8)', 8 + x, 8 - hh, 1, hh * 2 + 1);
-      if (hh > 2) R('rgba(150,185,208,0.4)', 8 + x, 8 + Math.floor(hh / 2), 1, Math.ceil(hh / 2));
+  sprite(30, 19, (R) => {
+    const wing = '#304e6a';
+    const edge = '#567995';
+    for (const side of [-1, 1]) {
+      for (let row = 1; row <= 7 - flap; row++) {
+        const y = 9 + side * row;
+        const left = 13 - row;
+        const right = 24 - row * 2;
+        R(wing, left, y, right - left + 1, 1);
+        R(edge, right, y, 1, 1);
+      }
     }
-    for (let i = 0; i < 8; i++) R('rgba(18,36,62,0.8)', i, 8 + (i % 2), 1, 1);
-    R('rgba(18,36,62,0.8)', 26, 5, 3, 2); R('rgba(18,36,62,0.8)', 26, 10, 3, 2);
-    R('#e9f6ff', 25, 8, 1, 1);
+    R(edge, 1, 11, 4, 1);
+    R(edge, 5, 10, 4, 1);
+    R(edge, 9, 9, 5, 1);
+    R('#203b56', 13, 8, 12, 3);
+    R(wing, 19, 7, 6, 1);
+    R(wing, 19, 11, 6, 1);
+    R(edge, 24, 7, 3, 1);
+    R(edge, 24, 11, 3, 1);
+    R('#bce8f6', 23, 8, 1, 1);
   });
 const mantaA = mantaFrame(0);
 const mantaB = mantaFrame(2);
@@ -378,7 +389,7 @@ export function createScene(canvas, { onFrame } = {}) {
   let shown = 0, target = 0, from = 0, t0 = -1, dur = 1;
   let dirty = true;
   let krillArt, anglerArt, jellyArt, isopodArt, cave;
-  let kelp, coral, trawler;
+  let trawler;
   const loadArt = (file, onLoad) => {
     const image = new Image();
     image.onload = () => { onLoad(image); dirty = true; };
@@ -389,11 +400,9 @@ export function createScene(canvas, { onFrame } = {}) {
     anglerArt = artSprite(image, [24, 0, 65, 46], 65, 46);
   });
   loadArt('./art/glebiny.png', (image) => {
-    cave = artSprite(image, [724, 5, 724, 714], 230, 227);
+    cave = image;
   });
   loadArt('./art/morze.png', (image) => {
-    kelp = artSprite(image, [765, 12, 387, 573], 24, 36);
-    coral = artSprite(image, [34, 731, 568, 385], 48, 33);
     trawler = artSprite(image, [677, 698, 565, 410], 64, 46);
   });
   loadArt('./art/stworzenia.png', (image) => {
@@ -485,31 +494,6 @@ export function createScene(canvas, { onFrame } = {}) {
   function fill(col, x, y, w, h) {
     ctx.fillStyle = col;
     ctx.fillRect(Math.round(x), Math.round(y), w, h);
-  }
-
-  function drawKelp(x, y, phase) {
-    // Kołyszą się końce liści, a podstawa zostaje na miejscu.
-    for (let row = 0; row < kelp.height; row += 2) {
-      const bend = Math.round(Math.sin(phase + row * 0.16) * 3 * (1 - row / kelp.height));
-      ctx.drawImage(kelp, 0, row, kelp.width, 2, x + bend, y + row, kelp.width, 2);
-    }
-  }
-
-  function drawSeascape(chunk, t, camY, surfaceY) {
-    if (!kelp || chunk > 8) return;
-    const rand = rng(2903 + chunk);
-    const count = chunk === 0 ? 5 : 3;
-    for (let i = 0; i < count; i += 1) {
-      const x = Math.round(rand() * W);
-      const floor = chunk * CH + 36 + i * (CH - 55) / count;
-      const y = Math.round(floor - camY);
-      if (y < surfaceY || y < -8 || y > H + 36) continue;
-      if (i % 2 === 0 || chunk === 0) {
-        drawKelp(x, y - kelp.height, t * 1.6 + i);
-      } else if (coral) {
-        ctx.drawImage(coral, x, y - coral.height);
-      }
-    }
   }
 
   function drawCreature(c, t, camY, surfaceY) {
@@ -632,11 +616,17 @@ export function createScene(canvas, { onFrame } = {}) {
     // woda
     for (let y = Math.max(0, surfaceY); y < H; y += 3) fill(css(waterColor((camY + y + 1) / K)), 0, y, W, 3);
 
-    if (cave && shown > 50) {
-      const top = Math.max(0, surfaceY);
+    const waterTop = Math.max(0, surfaceY);
+    const waterHeight = H - waterTop;
+    if (cave && shown > 50 && waterHeight > 0) {
+      // Kadrujemy oryginał proporcjonalnie do obszaru wody.
+      const scale = Math.max(W / 724, waterHeight / 714);
+      const cropWidth = W / scale;
+      const cropHeight = waterHeight / scale;
       ctx.save();
-      ctx.globalAlpha = clamp01((shown - 50) / 240) * (shown > 3000 ? 0.36 : 0.5);
-      ctx.drawImage(cave, 0, top, W, H - top);
+      ctx.globalAlpha = clamp01((shown - 50) / 240) * (0.5 - 0.14 * clamp01((shown - 3000) / 2000));
+      ctx.drawImage(cave, 724 + (724 - cropWidth) / 2, 5 + (714 - cropHeight) / 2,
+        cropWidth, cropHeight, 0, waterTop, W, waterHeight);
       ctx.restore();
     }
 
@@ -681,7 +671,6 @@ export function createScene(canvas, { onFrame } = {}) {
     const ciMin = Math.max(0, Math.floor(camY / CH) - 1);
     const ciMax = Math.floor((camY + H) / CH) + 1;
     for (let ci = ciMin; ci <= ciMax; ci++) {
-      drawSeascape(ci, t, camY, surfaceY);
       const ch = getChunk(ci);
       for (const g of ch.glow) {
         const y = g.wy - camY;
@@ -811,10 +800,10 @@ export function createScene(canvas, { onFrame } = {}) {
       } else {
         ctx.drawImage(boat, Math.round(kx - 22 + 4), surfaceY - 20 + bob);
       }
-      if (!kelp && !reduce) {
+      if (surfaceY >= 0) {
         // pływające kępy sargassum z zwisającymi pędami
-        for (let c = 0; c < 5; c++) {
-          const cx = Math.round((((c * 211 + 80 + t * 1.2) % (W + 60)) + W + 60) % (W + 60) - 30);
+        for (let c = 0; c < 3; c++) {
+          const cx = Math.round((0.25 + c * 0.34) * W + Math.sin(t * 0.45 + c) * 3);
           fill('rgba(110,120,40,0.9)', cx, surfaceY - 1, 9 + (c % 3) * 3, 2);
           fill('rgba(150,165,60,0.9)', cx + 2, surfaceY - 2, 5, 1);
           for (let k = 0; k < 4; k++) {
