@@ -4,7 +4,7 @@ import { cat, group } from './util.js';
 export default [
   cat(
     'imie',
-    'Polskie imię (męskie lub żeńskie)',
+    'Imię używane w Polsce (męskie lub żeńskie)',
     group(60, 'Jan', 'Piotr', 'Paweł', 'Michał', 'Tomasz', 'Marcin', 'Kamil', 'Jakub', 'Mateusz', 'Adam', 'Krzysztof',
       'Andrzej', 'Anna', 'Maria', 'Katarzyna', 'Agnieszka', 'Małgorzata', 'Ewa', 'Magdalena', 'Joanna', 'Monika',
       'Aleksandra', 'Natalia', 'Karolina', 'Julia', 'Zuzanna', 'Maja', 'Barbara', 'Marta', 'Paulina'),

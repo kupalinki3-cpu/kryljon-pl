@@ -256,13 +256,83 @@ test('kolejka do rozbudowy bazy: odpowiedzi bez echa liczone raz na gracza, dost
   }
   assert.equal((await call(env, 'GET', '/api/admin/unmatched')).status, 401);
   assert.equal((await call(env, 'GET', '/api/admin/unmatched', { headers: { authorization: 'Bearer zle' } })).status, 401);
-  const ok = await call(env, 'GET', '/api/admin/unmatched', { headers: { authorization: 'Bearer sekret-admina' } });
+  const ok = await call(env, 'GET', '/api/admin/unmatched?min=2', { headers: { authorization: 'Bearer sekret-admina' } });
   assert.equal(ok.status, 200);
   assert.equal(ok.json.rows.length, 1, 'tylko odpowiedzi od co najmniej 2 graczy');
   assert.equal(ok.json.rows[0].norm, 'atlantyda zazolc');
   assert.equal(ok.json.rows[0].n, 2, 'gracz powtarzający to samo liczy się raz');
   const closed = await call(setup(), 'GET', '/api/admin/unmatched', { headers: { authorization: 'Bearer undefined' } });
   assert.equal(closed.status, 401);
+});
+
+test('kolejka wymaga trzech graczy i decyzja dodaje odpowiedź w tej kategorii', async () => {
+  const env = setup({ ADMIN_TOKEN: 'sekret-admina' });
+  const headers = { authorization: 'Bearer sekret-admina' };
+  const chosen = PROMPTS.slice(0, PROMPTS_PER_DAY);
+  const ids = JSON.stringify(chosen.map((prompt) => prompt.id));
+  const promptId = chosen[0].id;
+  const entry = 'Przykład do akceptacji';
+  const rejected = 'Przykład do odrzucenia';
+  const vote = async (token, word) => {
+    const started = await call(env, 'POST', '/api/run', { body: { token, ...FREE, fresh: true } });
+    env.DB.raw.prepare('UPDATE runs SET prompts = ? WHERE id = ?').run(ids, started.json.runId);
+    await call(env, 'POST', '/api/prompt', { body: { token, ...FREE } });
+    const answer = await call(env, 'POST', '/api/answer', {
+      body: { token, ...FREE, idx: 0, answer: word }, now: T0 + 6000,
+    });
+    return answer.json;
+  };
+  const approval = { promptId, answer: entry, decision: 'approve', meters: 250 };
+  for (let i = 0; i < 3; i++) assert.equal((await vote(tok(1), entry)).noEcho, true);
+  assert.equal((await call(env, 'GET', '/api/admin/unmatched', { headers })).json.rows.length, 0);
+  assert.equal((await call(env, 'POST', '/api/admin/review', { headers, body: approval })).status, 409);
+  for (const token of [tok(2), tok(3)]) await vote(token, entry.toUpperCase());
+  for (const token of [tok(1), tok(2), tok(3)]) await vote(token, rejected);
+  const queue = await call(env, 'GET', '/api/admin/unmatched', { headers });
+  assert.deepEqual(queue.json.rows.map((row) => row.n), [3, 3]);
+  assert.equal((await call(env, 'POST', '/api/admin/review', { body: approval })).status, 401);
+  assert.equal((await call(env, 'POST', '/api/admin/review', { headers, body: approval })).status, 200);
+  assert.equal((await call(env, 'POST', '/api/admin/review', {
+    headers, body: { promptId, answer: rejected, decision: 'reject' },
+  })).status, 200);
+  assert.equal((await call(env, 'GET', '/api/admin/unmatched', { headers })).json.rows.length, 0);
+  assert.equal((await vote(tok(4), entry)).result.shown, entry);
+  assert.equal((await vote(tok(4), rejected)).noEcho, true);
+});
+
+test('Gemini przyjmuje brakujące hasło z dopasowanym źródłem bez zatrzymywania gry', async (t) => {
+  const env = setup({ GEMINI_API_KEY: 'klucz-do-mocka' });
+  const token = tok(9);
+  const word = 'Próbna Rzeczka';
+  const oldPromptIds = ['rzeka', ...PROMPTS.filter((p) => p.id !== 'rzeka').slice(0, 6).map((p) => p.id)];
+  env.DB.raw.prepare('INSERT INTO days (day, prompts) VALUES (?, ?)').run(DAY, JSON.stringify(oldPromptIds));
+  const original = await call(env, 'POST', '/api/run', { body: { token, name: 'Do testu' } });
+  await call(env, 'POST', '/api/prompt', { body: { token } });
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    if (url.includes('/search/page?')) {
+      return Response.json({ pages: [{ key: 'Probna_Rzeczka', title: word }] });
+    }
+    if (url.includes('/page/summary/')) return Response.json({ type: 'standard', extract: 'Próbna Rzeczka jest rzeką w Polsce.' });
+    assert.match(url, /^https:\/\/generativelanguage\.googleapis\.com\//);
+    assert.equal(init.headers['x-goog-api-key'], 'klucz-do-mocka');
+    assert.ok(!init.body.includes(token));
+    return Response.json({ candidates: [{ content: { parts: [
+      { text: JSON.stringify({ verified: true, answer: word, rarity: 3, source: 1 }) },
+    ] } }] });
+  });
+  const checks = [];
+  const submit = () => handle(new Request('https://glebia.test/api/answer', { method: 'POST',
+    body: JSON.stringify({ token, runId: original.json.runId, idx: 0, answer: word }) }),
+  env, T0 + 6000, { waitUntil: (job) => checks.push(job) });
+  const pending = await (await submit()).json();
+  assert.equal(pending.noEcho, true);
+  assert.equal(pending.aiChecking, true);
+  await Promise.all(checks);
+  const accepted = await (await submit()).json();
+  assert.equal(accepted.result.shown, word);
+  assert.equal(accepted.result.source, 'https://pl.wikipedia.org/wiki/Probna_Rzeczka');
+  assert.equal(checks.length, 1);
+  assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM ai_answer_checks').get().n, 1);
 });
 
 test('wznowienie biegu rankingowego nie zużywa podejścia ani nie zmienia pseudonimu', async () => {

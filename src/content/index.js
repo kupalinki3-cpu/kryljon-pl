@@ -28,7 +28,9 @@ import { terytCategories, terytExtras } from './teryt.js';
 import produktyTradycyjne from './produkty-tradycyjne.js';
 import uzupPopularne from './uzup-popularne.js';
 import uzupSprawdzone from './uzup-sprawdzone.js';
+import uzupKategorie from './uzup-kategorie.js';
 import nazwiskaPesel from './nazwiska-pesel.js';
+import imionaPesel from './imiona-pesel.js';
 import { wikiCategories, wikiExtras } from './uzup-wikipedia.js';
 import { normalize } from '../game.js';
 
@@ -38,7 +40,7 @@ for (const part of [
   uzupelnieniaPodstawowe, uzupPrzyroda, uzupKultura, uzupLudzie, uzupReszta, uzupNet,
   uzupMasa, uzupMasa2, uzupMasa3, uzupMasa4, uzupMasa5, uzupPopularne, uzupWirale,
   terytExtras, produktyTradycyjne, wikiExtras, uzupKraj, uzupKulturaPolska, uzupLudziePolska, uzupPolon, uzupSprawdzone,
-  { nazwisko: nazwiskaPesel },
+  uzupKategorie, { nazwisko: nazwiskaPesel, imie: imionaPesel },
 ]) {
   for (const [id, list] of Object.entries(part)) uzupelnienia[id] = [...(uzupelnienia[id] ?? []), ...list];
 }
@@ -103,4 +105,29 @@ function withSurnames(prompt) {
   return { ...prompt, answers };
 }
 
-export const PROMPTS = BASE.map(withExtras).map(withSurnames);
+const nameFormats = {
+  miasto: (name) => [`miasto ${name}`],
+  metro: (name) => [`Metro ${name}`, `stacja metra ${name}`],
+  park: (name) => [`PN ${name}`, `${name} PN`, `Park Narodowy ${name}`],
+  powiat_ziemski: (name) => [`powiat ziemski ${name}`],
+  gmina_wiejska: (name) => [`gmina wiejska ${name}`],
+  park_krajobrazowy: (name) => [`PK ${name.replace(/park krajobrazowy/iu, '').trim()}`],
+};
+
+function withNameFormats(prompt) {
+  const formats = nameFormats[prompt.id];
+  if (!formats) return prompt;
+  const taken = new Set(prompt.answers.flatMap((entry) => entry.slice(1).map(normalize)));
+  const answers = prompt.answers.map((entry) => {
+    const added = formats(entry[1]).filter((alias) => {
+      const key = normalize(alias);
+      if (taken.has(key)) return false;
+      taken.add(key);
+      return true;
+    });
+    return [...entry, ...added];
+  });
+  return { ...prompt, answers };
+}
+
+export const PROMPTS = BASE.map(withExtras).map(withSurnames).map(withNameFormats);

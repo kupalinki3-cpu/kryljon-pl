@@ -160,9 +160,16 @@ input[disabled] { opacity: 0.5; }
 
 .legend { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 12px 0 2px; padding: 10px 0 0; border-top: 2px dashed rgba(98, 230, 255, 0.2); font-size: 0.85rem; color: var(--muted); }
 .legend li { display: flex; align-items: center; gap: 6px; }
-.sq { display: inline-block; width: 12px; height: 12px; background: var(--t0); }
-.sq.t1 { background: var(--t1); } .sq.t2 { background: var(--t2); } .sq.t3 { background: var(--t3); }
-.sq.t4 { background: var(--t4); } .sq.t5 { background: var(--t5); } .sq.t6 { background: var(--t6); }
+.sq {
+  --gem: var(--t0);
+  display: inline-block; position: relative; flex: none; width: 16px; height: 16px;
+  background: var(--gem);
+  clip-path: polygon(37.5% 0, 62.5% 0, 62.5% 12.5%, 75% 12.5%, 75% 25%, 87.5% 25%, 87.5% 37.5%, 100% 37.5%, 100% 62.5%, 87.5% 62.5%, 87.5% 75%, 75% 75%, 75% 87.5%, 62.5% 87.5%, 62.5% 100%, 37.5% 100%, 37.5% 87.5%, 25% 87.5%, 25% 75%, 12.5% 75%, 12.5% 62.5%, 0 62.5%, 0 37.5%, 12.5% 37.5%, 12.5% 25%, 25% 25%, 25% 12.5%, 37.5% 12.5%);
+  box-shadow: inset -3px -3px rgba(3, 9, 26, 0.36);
+}
+.sq::after { content: ''; position: absolute; top: 4px; left: 4px; width: 4px; height: 4px; background: rgba(255, 255, 255, 0.65); }
+.sq.t1 { --gem: var(--t1); } .sq.t2 { --gem: var(--t2); } .sq.t3 { --gem: var(--t3); }
+.sq.t4 { --gem: var(--t4); } .sq.t5 { --gem: var(--t5); } .sq.t6 { --gem: var(--t6); }
 
 /* pytanie */
 .prompt-panel { position: absolute; top: 104px; left: 50%; transform: translateX(-50%); width: min(660px, calc(100% - var(--gutter) * 2)); padding: 20px 24px 14px; }
@@ -209,7 +216,9 @@ input[disabled] { opacity: 0.5; }
 /* wynik końcowy */
 .final-title { margin: 0; font-size: 1.5rem; color: var(--amber); }
 .big { margin: 4px 0 0; font-size: clamp(3rem, 12vw, 5rem); font-weight: 700; color: var(--cyan); line-height: 1.1; text-shadow: 0 4px 0 #0b3b66; }
-.squares { font-size: 1.7rem; letter-spacing: 0.12em; margin: 8px 0 6px; }
+.squares { display: flex; gap: 8px; margin: 10px 0 8px; }
+.squares .sq { width: 22px; height: 22px; }
+.flavor a { color: var(--cyan); }
 .recap { margin: 10px 0 6px; padding-left: 2.2rem; color: var(--muted); font-size: 0.95rem; max-height: 30vh; overflow-y: auto; }
 .recap li { margin: 7px 0; }
 .recap strong { color: var(--ink); }

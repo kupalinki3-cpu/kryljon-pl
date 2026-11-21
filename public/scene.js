@@ -5,6 +5,7 @@
 
 const K = 0.8; // piksele sceny na metr głębokości
 const CH = 400; // wysokość jednego kawałka świata w pikselach sceny
+const DIVE_COLORS = ['215,242,255', '185,201,214', '79,176,255', '91,224,138', '255,200,87', '255,138,61', '197,123,255'];
 
 const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const WATER = [
@@ -387,6 +388,7 @@ export function createScene(canvas, { onFrame } = {}) {
   const pings = [];
   let S = 4, W = 0, H = 0;
   let shown = 0, target = 0, from = 0, t0 = -1, dur = 1;
+  let diveColor = DIVE_COLORS[0];
   let dirty = true;
   let krillArt, anglerArt, jellyArt, mantaArt, isopodArt, cave, surfaceArt, trawler;
   const loadArt = (file, onLoad) => {
@@ -450,7 +452,7 @@ export function createScene(canvas, { onFrame } = {}) {
   addEventListener('resize', resize);
   resize();
 
-  function setDepth(m, animate = true) {
+  function setDepth(m, animate = true, tier = 0) {
     target = m;
     dirty = true;
     if (!animate || reduce) {
@@ -460,9 +462,10 @@ export function createScene(canvas, { onFrame } = {}) {
       return;
     }
     from = shown;
+    diveColor = DIVE_COLORS[tier] ?? DIVE_COLORS[0];
     t0 = performance.now();
     // Nawet mały zjazd trwa dość długo i ma wyraźny rozbieg, a duży jest szybszy, nie wolniejszy w odbiorze.
-    dur = Math.min(3800, 1400 + Math.abs(m - from) * 0.45);
+    dur = Math.min(3100, 950 + Math.sqrt(Math.abs(m - from)) * 21);
   }
 
   const krillPos = (camY, t) => {
@@ -790,8 +793,9 @@ export function createScene(canvas, { onFrame } = {}) {
       for (const s of stat.streaks) {
         const y = ((((s.y - camY * s.par * 1.4) % span) + span) % span) - 40;
         if (y < surfaceY) continue;
-        const len = Math.round(5 + f * 38 * s.par);
-        fill(`rgba(215,242,255,${(0.05 + 0.32 * f * s.a).toFixed(3)})`, s.x * W, y, 1, len);
+        const len = Math.round(5 + f * 52 * s.par);
+        fill(`rgba(${diveColor},${(0.04 + 0.22 * f * s.a).toFixed(3)})`, s.x * W, y, 1, len);
+        fill(`rgba(225,249,255,${(f * s.a * 0.35).toFixed(3)})`, s.x * W, y + len - 2, 1, 2);
       }
       // ciemniejące brzegi ekranu przy szybkim zjeździe
       const edge = (f * 0.35).toFixed(3);

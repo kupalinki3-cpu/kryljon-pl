@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PROMPTS } from '../src/content/index.js';
+import { parseVerifiedAnswer } from '../src/answer-ai.js';
 import {
   BANDS,
   PROMPTS_PER_DAY,
@@ -19,6 +20,17 @@ import {
 } from '../src/game.js';
 
 const byId = (id) => PROMPTS.find((p) => p.id === id);
+
+test('weryfikacja AI wymaga istniejącego źródła i tej samej odpowiedzi', () => {
+  const verdict = (source, answer = 'Hasło') => ({
+    candidates: [{ content: { parts: [{ text: JSON.stringify({ verified: true, answer, rarity: 4, source }) }] } }],
+  });
+  const sources = [{ url: 'https://pl.wikipedia.org/wiki/Has%C5%82o' }];
+  assert.equal(parseVerifiedAnswer(verdict(2), 'haslo', sources), null);
+  assert.equal(parseVerifiedAnswer(verdict(1, 'Inny wpis'), 'haslo', sources), null);
+  assert.equal(parseVerifiedAnswer(verdict(1), 'haslo', []), null);
+  assert.equal(parseVerifiedAnswer(verdict(1), 'haslo', sources).meters, 2600);
+});
 
 test('nazwiska z PESEL zaliczają obie podobne pisownie i rzadkie nazwiska', () => {
   const prompt = byId('nazwisko');
@@ -109,7 +121,7 @@ test('pasma głębokości i punkty z metrów', () => {
   assert.equal(depthBand(200).tier, 2);
   assert.equal(depthBand(3999).tier, 4);
   assert.equal(depthBand(10000).tier, 6);
-  assert.equal(depthBand(1e9).name, 'Legenda głębin', 'brak górnej granicy głębokości');
+  assert.equal(depthBand(1e9).name, '???', 'brak górnej granicy głębokości');
   assert.ok(BANDS.every((b, i) => i === 0 || b.max > BANDS[i - 1].max));
   assert.equal(pointsOf(0), 0);
   assert.equal(pointsOf(5000), 500);

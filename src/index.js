@@ -1,4 +1,5 @@
 import { PROMPTS } from './content/index.js';
+import { checkWithGemini, reserveAiCheck } from './answer-ai.js';
 import {
   buildIndex,
   GRACE_MS,
@@ -67,6 +68,7 @@ async function playerHash(token) {
 
 const POLISH_IDS = PROMPTS.map((p) => p.id);
 const MAX_MISSES = 40; // prób "bez echa" na jedno pytanie
+const REVIEW_MIN_PLAYERS = 3;
 const MODES = new Set(['daily', 'free']);
 
 /** Zamienia zapisane id na kategorie; usunięte kiedyś id zastępuje innymi, żeby stary dzień się nie wywrócił. */
@@ -248,6 +250,7 @@ async function handleToday(env, now) {
     yesterday: prevDay(day),
     total: (await dayPrompts(env, day)).length,
     resetsInMs: msUntilNextDay(now),
+    aiEnabled: !!env.GEMINI_API_KEY,
   });
 }
 
@@ -340,7 +343,7 @@ async function handlePrompt(request, env, now) {
   });
 }
 
-async function handleAnswer(request, env, now) {
+async function handleAnswer(request, env, now, ctx) {
   const body = await readBody(request);
   const { run, prompts } = await loadRun(body, env, now);
   if (run.finished || body.idx !== run.idx || run.started_at == null) {
@@ -349,12 +352,20 @@ async function handleAnswer(request, env, now) {
   }
   const raw = typeof body.answer === 'string' ? body.answer.slice(0, MAX_ANSWER_LEN) : '';
   const prompt = prompts[run.idx];
-  const match = matchAnswer(prompt, raw);
+  const norm = normalize(raw);
+  if (!norm) return json({ noEcho: true, empty: true, tries: 0 });
+  const review = await env.DB.prepare(
+    `SELECT COUNT(*) AS extra, MAX(CASE WHEN norm = ? THEN display END) AS shown,
+      MAX(CASE WHEN norm = ? THEN meters END) AS meters,
+      MAX(CASE WHEN norm = ? THEN sources END) AS sources
+      FROM reviewed_answers WHERE prompt_id = ? AND meters IS NOT NULL`,
+  ).bind(norm, norm, norm, prompt.id).first();
+  const match = review.shown && !buildIndex(prompt).map.has(norm)
+    ? { shown: review.shown, meters: review.meters, norm, source: JSON.parse(review.sources ?? '[]')[0] }
+    : matchAnswer(prompt, raw);
 
   if (!match) {
     // Brak echa: odpowiedzi nie ma w bazie. Pytanie trwa dalej, zegar się nie zatrzymuje, gracz próbuje jeszcze raz.
-    const norm = normalize(raw);
-    if (!norm) return json({ noEcho: true, empty: true, tries: 0 });
     const prev = await env.DB.prepare('SELECT COUNT(*) AS n FROM misses WHERE run_id = ? AND idx = ?')
       .bind(run.id, run.idx)
       .first();
@@ -362,11 +373,18 @@ async function handleAnswer(request, env, now) {
     await env.DB.prepare('INSERT INTO misses (run_id, idx, prompt_id, raw, norm, created_at) VALUES (?, ?, ?, ?, ?, ?)')
       .bind(run.id, run.idx, prompt.id, raw, norm, now)
       .run();
-    return json({ noEcho: true, raw, tries: prev.n + 1, maxTries: MAX_MISSES });
+    const aiChecking = !!(env.GEMINI_API_KEY && ctx && await reserveAiCheck(env, run.player, prompt.id, norm, raw, now));
+    if (aiChecking) {
+      ctx.waitUntil(checkWithGemini(env, prompt, norm, now).catch(() => {
+        console.warn('Weryfikacja Gemini chwilowo niedostępna');
+      }));
+    }
+    return json({ noEcho: true, raw, tries: prev.n + 1, maxTries: MAX_MISSES, aiChecking });
   }
 
   const pop = await popularity(env, prompt.id, now);
-  const meters = adjustMeters(match.meters, pop.counts.get(match.shown) ?? 0, pop.max, pop.total, prompt.answers.length);
+  const meters = adjustMeters(match.meters, pop.counts.get(match.shown) ?? 0, pop.max, pop.total,
+    prompt.answers.length + review.extra);
   const ms = Math.min(LIMIT_MS, Math.max(MIN_ANSWER_MS, now - run.started_at));
   const share = await crowdShare(env, run.day, prompt.id, match.shown);
   try {
@@ -387,6 +405,7 @@ async function handleAnswer(request, env, now) {
     points: pointsOf(meters),
     ms,
     share,
+    source: match.source,
   };
   return json({ result, state: await runState(env, after, prompts) });
 }
@@ -431,24 +450,62 @@ function safeEqual(a, b) {
   return diff === 0;
 }
 
-/** Najczęstsze odpowiedzi bez echa (po jednym głosie na gracza): surowiec do rozbudowy bazy o nowe wpisy. */
-async function handleUnmatched(request, env) {
+function requireAdmin(request, env) {
   const auth = request.headers.get('authorization') || '';
   const expected = env.ADMIN_TOKEN ? `Bearer ${env.ADMIN_TOKEN}` : null;
   if (!expected || !safeEqual(auth, expected)) throw new HttpError(401, 'Brak dostępu');
-  const url = new URL(request.url);
-  const min = Math.max(1, Number(url.searchParams.get('min')) || 2);
-  const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit')) || 200));
-  const { results } = await env.DB.prepare(
-    `SELECT prompt_id, norm, MIN(raw) AS sample, COUNT(DISTINCT run_id) AS n
-     FROM misses GROUP BY prompt_id, norm HAVING n >= ? ORDER BY n DESC LIMIT ?`,
-  )
-    .bind(min, limit)
-    .all();
-  return json({ rows: results });
 }
 
-export async function handle(request, env, now = Date.now()) {
+/** Kolejka odpowiedzi bez echa, z jednym głosem na token gracza. */
+async function handleUnmatched(request, env) {
+  requireAdmin(request, env);
+  const url = new URL(request.url);
+  const min = Math.max(1, Number.parseInt(url.searchParams.get('min'), 10) || REVIEW_MIN_PLAYERS);
+  const limit = Math.min(500, Math.max(1, Number.parseInt(url.searchParams.get('limit'), 10) || 200));
+  const { results } = await env.DB.prepare(
+    `SELECT m.prompt_id, m.norm, MIN(m.raw) AS sample, COUNT(DISTINCT r.player) AS n
+     FROM misses AS m JOIN runs AS r ON r.id = m.run_id
+     LEFT JOIN reviewed_answers AS a ON a.prompt_id = m.prompt_id AND a.norm = m.norm
+     WHERE a.prompt_id IS NULL
+     GROUP BY m.prompt_id, m.norm HAVING n >= ? ORDER BY n DESC, m.prompt_id, m.norm LIMIT 500`,
+  )
+    .bind(min)
+    .all();
+  const rows = [];
+  for (const row of results) {
+    const prompt = PROMPT_BY_ID.get(row.prompt_id);
+    if (!prompt || buildIndex(prompt).map.has(row.norm)) continue;
+    rows.push({ ...row, category: prompt.text });
+    if (rows.length === limit) break;
+  }
+  return json({ rows, minimumPlayers: REVIEW_MIN_PLAYERS });
+}
+
+async function handleReview(request, env, now) {
+  requireAdmin(request, env);
+  const { promptId, answer, decision, meters } = await readBody(request);
+  const prompt = PROMPT_BY_ID.get(promptId);
+  const display = typeof answer === 'string' ? answer.trim() : '';
+  const norm = normalize(display);
+  if (!prompt || !norm || display.length > MAX_ANSWER_LEN || /[\p{Cc}\p{Cf}]/u.test(display)) {
+    throw new HttpError(400, 'Podaj poprawną kategorię i odpowiedź z kolejki');
+  }
+  const approve = decision === 'approve';
+  if (!(approve || decision === 'reject') || (approve && (!Number.isInteger(meters) || meters < 10 || meters > 100000))) {
+    throw new HttpError(400, 'Wybierz decyzję i podaj od 10 do 100 000 m przy zatwierdzaniu');
+  }
+  if (buildIndex(prompt).map.has(norm)) throw new HttpError(409, 'Odpowiedź jest już w bazie gry');
+  const write = await env.DB.prepare(
+    `INSERT OR IGNORE INTO reviewed_answers (prompt_id, norm, display, meters, reviewed_at)
+     SELECT ?, ?, ?, ?, ?
+     WHERE (SELECT COUNT(DISTINCT r.player) FROM misses AS m JOIN runs AS r ON r.id = m.run_id
+       WHERE m.prompt_id = ? AND m.norm = ?) >= ?`,
+  ).bind(prompt.id, norm, display, approve ? meters : null, now, prompt.id, norm, REVIEW_MIN_PLAYERS).run();
+  if (!write.meta.changes) throw new HttpError(409, 'Zgłoszenie ma za mało głosów lub już zostało sprawdzone');
+  return json({ reviewed: true });
+}
+
+export async function handle(request, env, now = Date.now(), ctx) {
   const url = new URL(request.url);
   const { pathname } = url;
   try {
@@ -458,9 +515,10 @@ export async function handle(request, env, now = Date.now()) {
     if (request.method === 'GET' && pathname === '/api/today') return await handleToday(env, now);
     if (request.method === 'GET' && pathname === '/api/leaderboard') return await handleLeaderboard(request, env, now);
     if (request.method === 'GET' && pathname === '/api/admin/unmatched') return await handleUnmatched(request, env);
+    if (request.method === 'POST' && pathname === '/api/admin/review') return await handleReview(request, env, now);
     if (request.method === 'POST' && pathname === '/api/run') return await handleRun(request, env, now);
     if (request.method === 'POST' && pathname === '/api/prompt') return await handlePrompt(request, env, now);
-    if (request.method === 'POST' && pathname === '/api/answer') return await handleAnswer(request, env, now);
+    if (request.method === 'POST' && pathname === '/api/answer') return await handleAnswer(request, env, now, ctx);
     return fail(404, 'Nie znaleziono');
   } catch (err) {
     if (err instanceof HttpError) return fail(err.status, err.message, err.extra);
@@ -470,5 +528,5 @@ export async function handle(request, env, now = Date.now()) {
 }
 
 export default {
-  fetch: (request, env) => handle(request, env),
+  fetch: (request, env, ctx) => handle(request, env, Date.now(), ctx),
 };

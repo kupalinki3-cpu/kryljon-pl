@@ -134,7 +134,7 @@ const scene = createScene($('scene'), {
     drawRuler(f);
   },
 });
-const setDepth = (m, animate = false) => scene.setDepth(m, animate);
+const setDepth = (m, animate = false, tier = 0) => scene.setDepth(m, animate, tier);
 
 function renderHud(currentIdx) {
   const wrap = $('hud-steps');
@@ -182,6 +182,7 @@ function stopTimer() {
 
 async function loadToday() {
   today = await api('GET', '/api/today');
+  $('ai-note').hidden = !today.aiEnabled;
   $('start-day').textContent = `Dzień ${today.day}.`;
   const upd = () => {
     const left = today.resetsInMs - (performance.now() - today.fetchedAt);
@@ -410,7 +411,9 @@ async function submit(auto = false) {
       input.value = '';
       input.focus();
       if (r.empty) return setHint('Wpisz odpowiedź.', true);
-      setHint(`Brak echa dla „${r.raw}”. Spróbuj jeszcze raz.`, true);
+      setHint(r.aiChecking
+        ? 'Gemini sprawdza odpowiedź. Możesz spróbować innej albo wrócić do tej za chwilę.'
+        : `Brak echa dla „${r.raw}”. Spróbuj jeszcze raz.`, true);
       scene.ping();
       sfx.noEcho();
       input.classList.remove('shake');
@@ -451,8 +454,16 @@ function showReveal(res, auto) {
   $('reveal-share').textContent = res.share
     ? `Taką samą odpowiedź wpisało dziś ${res.share.percent}% z ${res.share.total} graczy.`
     : FLAVOR[res.tier] ?? '';
+  if (res.source) {
+    const source = document.createElement('a');
+    source.href = res.source;
+    source.target = '_blank';
+    source.rel = 'noopener noreferrer';
+    source.textContent = 'Źródło';
+    $('reveal-share').append(' · ', source);
+  }
   renderHud(state.finished ? null : state.idx);
-  setDepth(state.depth, true);
+  setDepth(state.depth, true, res.tier);
   scene.burst();
   sfx.reveal(res.tier);
   $('ring').closest('.timer').classList.remove('urgent');
@@ -489,7 +500,11 @@ function showFinal() {
   if (daily && streak > 1) bits.push(`Seria: ${streak} dni z rzędu`);
   badge.textContent = bits.join(' · ');
   badge.hidden = bits.length === 0;
-  $('final-squares').textContent = state.history.map((h) => TIER_SQUARES[h.tier] ?? '⬛').join('');
+  $('final-squares').replaceChildren(...state.history.map(({ tier }) => {
+    const marker = document.createElement('i');
+    marker.className = `sq t${tier}`;
+    return marker;
+  }));
   const list = $('final-recap');
   list.replaceChildren();
   const maxM = Math.max(1, ...state.history.map((h) => h.meters || 0));

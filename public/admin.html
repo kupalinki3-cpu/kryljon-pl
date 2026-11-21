@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Polion · Odpowiedzi do sprawdzenia</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    body { overflow: auto; }
+    main { width: min(760px, calc(100% - 32px)); margin: 36px auto; }
+    h1 { color: var(--cyan); }
+    form { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+    input { color: var(--ink); background: #061222; border: 1px solid var(--cyan); padding: 8px; font: inherit; }
+    #queue { list-style: none; padding: 0; }
+    #queue li { margin: 14px 0; padding: 16px; }
+    #queue input { width: 95px; }
+    #queue h2 { margin: 0; overflow-wrap: anywhere; }
+    #queue p { margin: 4px 0 12px; color: var(--muted); }
+    [hidden] { display: none !important; }
+    a { color: var(--cyan); }
+  </style>
+</head>
+<body>
+  <main>
+    <a href="/">Wróć do gry</a>
+    <h1>Odpowiedzi do sprawdzenia</h1>
+    <form id="unlock">
+      <label for="admin-token">Token administratora</label>
+      <input id="admin-token" type="password" autocomplete="current-password" required>
+      <button class="btn cyan" type="submit">Pokaż kolejkę</button>
+    </form>
+    <div id="actions" class="row" hidden>
+      <button class="btn ghost" id="refresh" type="button">Odśwież kolejkę</button>
+      <button class="btn ghost" id="logout" type="button">Wyloguj</button>
+    </div>
+    <p id="status" role="status"></p>
+    <ul id="queue"></ul>
+  </main>
+  <script type="module" src="/admin.js"></script>
+</body>
+</html>

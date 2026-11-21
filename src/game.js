@@ -16,7 +16,7 @@ export const BANDS = [
   { max: 1500, tier: 3, name: 'Niezłe' },
   { max: 4000, tier: 4, name: 'Rzadkie' },
   { max: 10000, tier: 5, name: 'Głębinowe' },
-  { max: Infinity, tier: 6, name: 'Legenda głębin' },
+  { max: Infinity, tier: 6, name: '???' },
 ];
 
 /** Pasmo dla liczby metrów. 0 m (brak odpowiedzi w czasie) ma własne pasmo o numerze 0. */
