@@ -272,15 +272,15 @@ dialog::backdrop { background: rgba(2, 6, 15, 0.7); }
   display: block;
   width: var(--art-size, 64px);
   height: var(--art-size, 64px);
-  background: url('/art/ikony.png') 0 0 / 200% 200% no-repeat;
+  background: url('/art/ikony-v2.png') 0 0 / 300% 200% no-repeat;
   image-rendering: pixelated;
   pointer-events: none;
 }
 #view-start .panel, #view-final .panel, .reveal { position: relative; }
 .compass, .sonar, .treasure { position: absolute; top: 8px; right: 10px; }
-.sonar { background-position: 100% 0; --art-size: 56px; }
-.treasure { background-position: 0 100%; --art-size: 84px; }
-.podium { background-position: 100% 100%; --art-size: 48px; margin: -6px auto; }
+.sonar { background-position: 50% 0; --art-size: 56px; }
+.treasure { background-position: 100% 0; --art-size: 84px; }
+.podium { background-position: 0 100%; --art-size: 48px; margin: -6px auto; }
 .prompt-panel .prompt { padding-right: 44px; }
 .reveal {
   padding: 24px 62px 22px 24px;

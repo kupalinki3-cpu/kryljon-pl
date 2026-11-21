@@ -388,8 +388,7 @@ export function createScene(canvas, { onFrame } = {}) {
   let S = 4, W = 0, H = 0;
   let shown = 0, target = 0, from = 0, t0 = -1, dur = 1;
   let dirty = true;
-  let krillArt, anglerArt, jellyArt, isopodArt, cave;
-  let trawler;
+  let krillArt, anglerArt, jellyArt, mantaArt, isopodArt, cave, surfaceArt, trawler;
   const loadArt = (file, onLoad) => {
     const image = new Image();
     image.onload = () => { onLoad(image); dirty = true; };
@@ -397,16 +396,22 @@ export function createScene(canvas, { onFrame } = {}) {
   };
   loadArt('./art/kryl-i-zabnica.png', (image) => {
     krillArt = artSprite(image, [0, 0, 24, 18], 24, 18);
-    anglerArt = artSprite(image, [24, 0, 65, 46], 65, 46);
   });
-  loadArt('./art/glebiny.png', (image) => {
-    cave = image;
+  loadArt('./art/powierzchnia-v2.png', (image) => { surfaceArt = image; });
+  loadArt('./art/glebiny-v2.png', (image) => { cave = image; });
+  loadArt('./art/kuter-v2.png', (image) => {
+    trawler = Array.from({ length: 4 }, (_, i) => artSprite(image, [i * 543, 156, 543, 398], 74, 54));
   });
-  loadArt('./art/morze.png', (image) => {
-    trawler = artSprite(image, [677, 698, 565, 410], 64, 46);
+  loadArt('./art/stworzenia-v2.png', (image) => {
+    const frames = (y, h, width, height, padding = 0) => Array.from({ length: 4 }, (_, i) => {
+      const frame = artSprite(image, [i * 362 + padding, y, 362 - 2 * padding, h], width, height);
+      return { frame, reverse: flipped(frame) };
+    });
+    anglerArt = frames(98, 239, 65, 43);
+    jellyArt = frames(403, 294, 26, 30, 44);
+    mantaArt = frames(774, 232, 39, 25);
   });
   loadArt('./art/stworzenia.png', (image) => {
-    jellyArt = artSprite(image, [65, 638, 484, 596], 23, 29);
     isopodArt = artSprite(image, [631, 734, 615, 391], 43, 27);
   });
   let nextBubble = 0;
@@ -505,9 +510,11 @@ export function createScene(canvas, { onFrame } = {}) {
     switch (c.kind) {
       case 'fishS': ctx.drawImage(right ? fishS : fishSL, x, y); break;
       case 'fishM': ctx.drawImage(right ? fishM : fishML, x, y); break;
-      case 'jellyCyan':
-        ctx.drawImage(jellyArt ?? jellyCyan, x, y + Math.round(Math.sin(t * 1.5 + c.ph) * 3));
+      case 'jellyCyan': {
+        const pose = Math.floor(t * 3 + c.ph) % 4;
+        ctx.drawImage(jellyArt?.[pose].frame ?? jellyCyan, x, y + Math.round(Math.sin(t * 1.5 + c.ph) * 3));
         break;
+      }
       case 'isopod':
         if (isopodArt) drawSwim(ctx, isopodArt, x, y, true, reduce ? 0 : Math.sin(t * 3 + c.ph) * 1.4, !right);
         break;
@@ -522,6 +529,11 @@ export function createScene(canvas, { onFrame } = {}) {
       case 'shark': ctx.drawImage(right ? sharkR : sharkL, x, y); break;
       case 'whale': ctx.drawImage(right ? whaleR : whaleL, x, y + Math.round(Math.sin(t * 0.5 + c.ph) * 3)); break;
       case 'manta': {
+        if (mantaArt) {
+          const pose = mantaArt[Math.floor(t * 3 + c.ph) % 4];
+          ctx.drawImage(right ? pose.frame : pose.reverse, x, y);
+          break;
+        }
         const flapPhase = Math.floor(t * 2.2 + c.ph) % 2;
         ctx.drawImage(right ? (flapPhase ? mantaB : mantaA) : (flapPhase ? mantaBL : mantaAL), x, y);
         break;
@@ -544,11 +556,11 @@ export function createScene(canvas, { onFrame } = {}) {
       case 'reefYellow': ctx.drawImage(right ? reefYellow : reefYellowL, x, y); break;
       case 'angler': {
         if (anglerArt) {
-          const wave = reduce ? 0 : Math.sin(t * 5 + c.ph);
-          drawSwim(ctx, anglerArt, x, y, false, wave * 4, right);
+          const pose = anglerArt[Math.floor(t * 5 + c.ph) % 4];
+          ctx.drawImage(right ? pose.frame : pose.reverse, x, y);
           const lureX = x + (right ? 58 : 7);
           const glow = reduce ? 0.09 : 0.08 + 0.05 * Math.sin(t * 3 + c.ph);
-          disc(`rgba(182,117,255,${glow.toFixed(3)})`, lureX, y + 14, 10);
+          disc(`rgba(120,227,245,${glow.toFixed(3)})`, lureX, y + 10, 7);
           break;
         }
         ctx.drawImage(right ? anglerR : anglerL, x, y);
@@ -618,15 +630,26 @@ export function createScene(canvas, { onFrame } = {}) {
 
     const waterTop = Math.max(0, surfaceY);
     const waterHeight = H - waterTop;
-    if (cave && shown > 50 && waterHeight > 0) {
-      // Kadrujemy oryginał proporcjonalnie do obszaru wody.
-      const scale = Math.max(W / 724, waterHeight / 714);
-      const cropWidth = W / scale;
-      const cropHeight = waterHeight / scale;
+    if (surfaceArt && shown < 170) {
+      const height = Math.max(H * 1.16, W * surfaceArt.height / surfaceArt.width);
+      const width = height * surfaceArt.width / surfaceArt.height;
       ctx.save();
-      ctx.globalAlpha = clamp01((shown - 50) / 240) * (0.5 - 0.14 * clamp01((shown - 3000) / 2000));
-      ctx.drawImage(cave, 724 + (724 - cropWidth) / 2, 5 + (714 - cropHeight) / 2,
-        cropWidth, cropHeight, 0, waterTop, W, waterHeight);
+      ctx.globalAlpha = 1 - clamp01((shown - 35) / 135);
+      ctx.drawImage(surfaceArt, Math.round((W - width) / 2), Math.round(surfaceY - height * 0.28), Math.ceil(width), Math.ceil(height));
+      ctx.restore();
+    }
+    if (cave && shown > 45 && waterHeight > 0) {
+      const scale = Math.max(W / cave.width, waterHeight / cave.height);
+      const width = Math.ceil(cave.width * scale);
+      const height = Math.ceil(cave.height * scale);
+      const x = Math.round((W - width) * (S === 3 ? 0.08 : 0.5));
+      const y = waterTop + Math.round((waterHeight - height) / 2);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, waterTop, W, waterHeight);
+      ctx.clip();
+      ctx.globalAlpha = clamp01((shown - 45) / 135) * (0.96 - 0.31 * clamp01((shown - 1600) / 5000));
+      ctx.drawImage(cave, x, y, width, height);
       ctx.restore();
     }
 
@@ -635,7 +658,7 @@ export function createScene(canvas, { onFrame } = {}) {
       for (let y = Math.max(0, surfaceY); y < H; y += 2) {
         const m = (camY + y) / K;
         if (m > 1500) break;
-        const a = 0.075 * (1 - m / 1500);
+        const a = (surfaceArt && m < 150 ? 0.024 : 0.043) * (1 - m / 1500);
         const x = r.x * W + (y - surfaceY) * r.s + Math.sin(t * 0.3 + r.x * 9) * 6;
         fill(`rgba(190,235,255,${a.toFixed(3)})`, x, y, r.w, 2);
       }
@@ -780,23 +803,16 @@ export function createScene(canvas, { onFrame } = {}) {
     if (surfaceY > -30 && surfaceY < H + 30) {
       const bob = Math.round(Math.sin(t * 1.1) * 1);
       if (trawler) {
-        const boatX = kx - 30;
-        const boatY = surfaceY - 37 + bob;
+        const frame = trawler[reduce ? 0 : Math.floor(t * 4) % trawler.length];
+        const boatX = Math.max(-3, kx - 17);
+        const boatY = surfaceY - 48 + bob;
         const draft = surfaceY - boatY;
-        ctx.drawImage(trawler, 0, 0, trawler.width, draft, boatX, boatY, trawler.width, draft);
+        ctx.drawImage(frame, 0, 0, frame.width, draft, boatX, boatY, frame.width, draft);
         ctx.save();
         ctx.globalAlpha = 0.32;
-        const submerged = trawler.height - draft;
-        ctx.drawImage(trawler, 0, draft, trawler.width, submerged, boatX, surfaceY, trawler.width, submerged);
+        const submerged = frame.height - draft;
+        ctx.drawImage(frame, 0, draft, frame.width, submerged, boatX, surfaceY, frame.width, submerged);
         ctx.restore();
-        const mastX = boatX + 34;
-        const flagY = boatY - 4;
-        fill('#263c54', mastX, flagY, 1, 12);
-        for (let i = 1; i <= 10; i += 1) {
-          const flutter = reduce ? 0 : Math.round(Math.sin(t * 5 - i * 0.5));
-          fill('#fff9fc', mastX + i, flagY + flutter, 1, 3);
-          fill('#dc2041', mastX + i, flagY + 3 + flutter, 1, 3);
-        }
       } else {
         ctx.drawImage(boat, Math.round(kx - 22 + 4), surfaceY - 20 + bob);
       }
@@ -820,9 +836,9 @@ export function createScene(canvas, { onFrame } = {}) {
         const ripple = Math.sin(x * 0.28 - flow * 2.1);
         const lift = Math.round(swell + ripple * 0.6);
         // Podstawowa linia i krótkie refleksy korzystają z błękitu płytkiej wody.
-        fill('#397faa', x, surfaceY + lift, 1, 2);
+        if (!surfaceArt) fill('#397faa', x, surfaceY + lift, 1, 2);
         if (swell + ripple > 0.58) {
-          fill(ripple > 0.7 ? '#a0cce4' : '#6aafd3', x, surfaceY + lift - 1, 1, 1);
+          fill(surfaceArt ? 'rgba(182,247,245,0.33)' : ripple > 0.7 ? '#a0cce4' : '#6aafd3', x, surfaceY + lift - 1, 1, 1);
         }
       }
     }
