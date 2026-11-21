@@ -19,18 +19,25 @@ export async function reserveAiCheck(env, player, promptId, norm, raw, now) {
 }
 
 const WIKI = 'https://pl.wikipedia.org';
-const WIKI_HEADERS = { 'Api-User-Agent': 'Polion/1.0 (https://glebia.kupalinki3.workers.dev/)' };
+const WIKI_AGENT = 'Polion/1.0 (https://glebia.kupalinki3.workers.dev/)';
+const WIKI_HEADERS = { 'User-Agent': WIKI_AGENT, 'Api-User-Agent': WIKI_AGENT };
 const wikiOptions = () => ({ headers: WIKI_HEADERS, signal: AbortSignal.timeout(3_000) });
 
 async function findSources(norm) {
   const search = await fetch(`${WIKI}/w/rest.php/v1/search/page?q=${encodeURIComponent(norm)}&limit=6`, wikiOptions());
-  if (!search.ok) return [];
+  if (!search.ok) {
+    console.warn('Weryfikacja Gemini: wyszukiwanie Wikipedii', search.status);
+    return [];
+  }
   const { pages } = await search.json();
   const titles = pages.filter((item) => normalize(item.title.replace(/\s*\([^)]*\)$/, '')) === norm).slice(0, 2);
   const sources = [];
   for (const page of titles) {
     const response = await fetch(`${WIKI}/api/rest_v1/page/summary/${encodeURIComponent(page.key)}`, wikiOptions());
-    if (!response.ok) continue;
+    if (!response.ok) {
+      console.warn('Weryfikacja Gemini: artykuł Wikipedii', response.status);
+      continue;
+    }
     const summary = await response.json();
     if (summary.type !== 'standard' || !summary.extract) continue;
     sources.push({ title: page.title, evidence: summary.extract.slice(0, 1300),
@@ -59,7 +66,10 @@ export function parseVerifiedAnswer(result, norm, sources) {
 
 export async function checkWithGemini(env, prompt, norm, now) {
   const sources = await findSources(norm);
-  if (!sources.length) return;
+  if (!sources.length) {
+    console.info('Weryfikacja Gemini: brak pasującego źródła');
+    return;
+  }
   const model = env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
@@ -80,9 +90,15 @@ export async function checkWithGemini(env, prompt, norm, now) {
         thinkingConfig: { thinkingLevel: 'MINIMAL' } },
     }),
   });
-  if (!response.ok) throw new Error(`Gemini status ${response.status}`);
+  if (!response.ok) {
+    console.warn('Weryfikacja Gemini: odpowiedź serwera', response.status);
+    return;
+  }
   const answer = parseVerifiedAnswer(await response.json(), norm, sources);
-  if (!answer) return;
+  if (!answer) {
+    console.info('Weryfikacja Gemini: odpowiedź niepotwierdzona');
+    return;
+  }
   await env.DB.prepare('INSERT OR IGNORE INTO reviewed_answers (prompt_id, norm, display, meters, reviewed_at, sources) VALUES (?, ?, ?, ?, ?, ?)')
     .bind(prompt.id, norm, answer.display, answer.meters, now, JSON.stringify(answer.sources)).run();
 }
