@@ -24,11 +24,11 @@ export default {
       'Koronowo', 'Nakło nad Notecią', 'Szubin', 'Żnin', 'Mogilno', 'Strzelno', 'Kruszwica', 'Radziejów', 'Aleksandrów Kujawski', 'Ciechocinek', 'Lipno', 'Rypin', 'Golub-Dobrzyń',
       'Wąbrzeźno', 'Łasin', 'Górzno', 'Nowe Miasto Lubawskie', 'Ostrzeszów', 'Syców', 'Trzebnica', 'Wołów', 'Milicz', 'Żmigród', 'Polkowice', 'Chocianów', 'Prochowice',
       'Szprotawa', 'Kożuchów', 'Nowogród Bobrzański', 'Zbąszynek', 'Skwierzyna', 'Strzelce Krajeńskie', 'Dębno', 'Barlinek', 'Pyrzyce', 'Gryfino', 'Nowogard', 'Łobez',
-      'Świdwin', 'Połczyn-Zdrój', 'Darłowo', 'Sławno', 'Rewal', 'Dziwnów', 'Międzyzdroje', 'Karwia', 'Jastarnia', 'Jastrzębia Góra', 'Krynica Morska', 'Sztutowo', 'Łeba', 'Ustka'),
+      'Świdwin', 'Połczyn-Zdrój', 'Darłowo', 'Sławno', 'Dziwnów', 'Międzyzdroje', 'Jastarnia', 'Krynica Morska', 'Łeba', 'Ustka'),
     ...group(3500, 'Pakość', 'Kcynia', 'Gołańcz', 'Margonin', 'Ujście', 'Trzcianka', 'Krzyż Wielkopolski', 'Sieraków', 'Lwówek', 'Pniewy', 'Zbąszyń', 'Zbąszyń', 'Rydzyna', 'Bojanowo',
       'Jutrosin', 'Sulmierzyce', 'Kobylin', 'Koźmin Wielkopolski', 'Dolsk', 'Książ Wielkopolski', 'Miłosław', 'Nekla', 'Pobiedziska', 'Kostrzyn', 'Murowana Goślina', 'Oborniki',
       'Rogoźno', 'Skoki', 'Kłecko', 'Witkowo', 'Trzemeszno', 'Orchowo', 'Pyzdry', 'Kleczew', 'Golina', 'Ślesin', 'Sompolno', 'Izbica Kujawska', 'Brześć Kujawski', 'Piotrków Kujawski',
-      'Lubraniec', 'Kowal', 'Bobrowniki', 'Dobrzyń nad Wisłą', 'Skępe', 'Zakrzewo', 'Tłuchowo', 'Szczutowo', 'Mochowo', 'Sierakowo'),
+      'Lubraniec', 'Kowal', 'Dobrzyń nad Wisłą', 'Skępe'),
   ],
   raper: [
     ...group(220, 'Paktofonika', 'Fisz Emade Tworzywo', ['Pięć Dwa Dubajtury', '52 Dębiec', 'Pięćdziesiąt dwa Dębiec'], 'Grammatik',
