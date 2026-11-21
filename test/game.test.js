@@ -21,6 +21,23 @@ import {
 
 const byId = (id) => PROMPTS.find((p) => p.id === id);
 
+test('Zamek w Bobolicach i jego warianty wskazują ten sam zamek', () => {
+  const prompt = byId('zamek');
+  const bobolice = matchAnswer(prompt, 'Bobolice');
+  assert.ok(bobolice);
+  for (const alias of ['Zamek Bobolice', 'Zamek w Bobolicach', 'Zamek Królewski w Bobolicach']) {
+    const match = matchAnswer(prompt, alias);
+    assert.equal(match?.entry, bobolice.entry);
+    assert.equal(match?.meters, bobolice.meters);
+  }
+});
+
+test('paradokument Szkoła TVN jest serialem', () => {
+  assert.equal(matchAnswer(byId('serial'), 'szkola')?.shown, 'Szkoła');
+  assert.equal(matchAnswer(byId('serial'), 'szkoła tvn')?.shown, 'Szkoła');
+  assert.equal(matchAnswer(byId('program'), 'szkoła'), null);
+});
+
 test('weryfikacja AI wymaga istniejącego źródła i tej samej odpowiedzi', () => {
   const verdict = (source, answer = 'Hasło') => ({
     candidates: [{ content: { parts: [{ text: JSON.stringify({ verified: true, answer, rarity: 4, source }) }] } }],

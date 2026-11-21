@@ -318,6 +318,7 @@ export default {
     Pogrzeb kartofla; Wino truskawkowe; Serce nie sługa
   `),
   serial: entries(495, `
+    Szkoła|Szkoła TVN|serial Szkoła;
     07 zgłoś się|07 zglos sie; Janosik; Kariera Nikodema Dyzmy; Z biegiem lat, z biegiem dni; Polskie drogi;
     Pogranicze w ogniu; Czarne chmury; Przygody pana Michała; Królowa Bona; 1920. Wojna i miłość; Królowie;
     Korona królów; Korona królów. Jagiellonowie; Jagiellonowie; Zatoka szpiegów; Ludzie Chudego;

@@ -2,20 +2,29 @@ import { MAX_ANSWER_LEN, normalize } from './game.js';
 
 const RARITY_METERS = [120, 320, 950, 2600, 6500];
 const DAY_MS = 86_400_000;
+const PLAYER_DAILY_LIMIT = 15;
+const GAME_DAILY_LIMIT = 50;
 
 // Jedno sprawdzenie danej pisowni na tydzień, z limitem per gracz i dla całej gry.
 export async function reserveAiCheck(env, player, promptId, norm, raw, now) {
-  if (norm.length < 2 || /@|https?:|\d{9}|[\p{Cc}\p{Cf}]/iu.test(raw)) return false;
+  if (norm.length < 2 || /@|https?:|\d{9}|[\p{Cc}\p{Cf}]/iu.test(raw)) return null;
+  const since = now - DAY_MS;
   const result = await env.DB.prepare(
     `INSERT INTO ai_answer_checks (prompt_id, norm, player, checked_at)
      SELECT ?, ?, ?, ?
      WHERE NOT EXISTS (SELECT 1 FROM reviewed_answers WHERE prompt_id = ? AND norm = ?)
        AND NOT EXISTS (SELECT 1 FROM ai_answer_checks WHERE prompt_id = ? AND norm = ? AND checked_at >= ?)
-       AND (SELECT COUNT(*) FROM ai_answer_checks WHERE player = ? AND checked_at >= ?) < 5
-       AND (SELECT COUNT(*) FROM ai_answer_checks WHERE checked_at >= ?) < 50`,
+       AND (SELECT COUNT(*) FROM ai_answer_checks WHERE player = ? AND checked_at >= ?) < ?
+       AND (SELECT COUNT(*) FROM ai_answer_checks WHERE checked_at >= ?) < ?`,
   ).bind(promptId, norm, player, now, promptId, norm, promptId, norm, now - 7 * DAY_MS,
-    player, now - DAY_MS, now - DAY_MS).run();
-  return result.meta.changes === 1;
+    player, since, PLAYER_DAILY_LIMIT, since, GAME_DAILY_LIMIT).run();
+  if (result.meta.changes === 1) return 'checking';
+  const { playerChecks, gameChecks } = await env.DB.prepare(
+    `SELECT
+       (SELECT COUNT(*) FROM ai_answer_checks WHERE player = ? AND checked_at >= ?) AS playerChecks,
+       (SELECT COUNT(*) FROM ai_answer_checks WHERE checked_at >= ?) AS gameChecks`,
+  ).bind(player, since, since).first();
+  return playerChecks >= PLAYER_DAILY_LIMIT || gameChecks >= GAME_DAILY_LIMIT ? 'limit' : null;
 }
 
 const WIKI = 'https://pl.wikipedia.org';

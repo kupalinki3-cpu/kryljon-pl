@@ -300,6 +300,25 @@ test('kolejka wymaga trzech graczy i decyzja dodaje odpowiedź w tej kategorii',
   assert.equal((await vote(tok(4), rejected)).noEcho, true);
 });
 
+test('znany zespół w pytaniu o solistę dostaje wskazówkę bez dodawania do kolejki', async () => {
+  const env = setup();
+  const token = tok(1);
+  const ids = ['piosenkarz', ...PROMPTS.filter((p) => p.id !== 'piosenkarz').slice(0, 6).map((p) => p.id)];
+  env.DB.raw.prepare('INSERT INTO days (day, prompts) VALUES (?, ?)').run(DAY, JSON.stringify(ids));
+  await call(env, 'POST', '/api/run', { body: { token, name: 'Test' } });
+  await call(env, 'POST', '/api/prompt', { body: { token } });
+  const wrong = await call(env, 'POST', '/api/answer', {
+    body: { token, idx: 0, answer: 'Varius Manx' }, now: T0 + 6000,
+  });
+  assert.equal(wrong.json.noEcho, true);
+  assert.equal(wrong.json.categoryHint, 'zespół muzyczny');
+  assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM misses').get().n, 0);
+  const correct = await call(env, 'POST', '/api/answer', {
+    body: { token, idx: 0, answer: 'Anita Lipnicka' }, now: T0 + 7000,
+  });
+  assert.equal(correct.json.result?.shown, 'Anita Lipnicka');
+});
+
 test('Gemini przyjmuje brakujące hasło z dopasowanym źródłem bez zatrzymywania gry', async (t) => {
   const env = setup({ GEMINI_API_KEY: 'klucz-do-mocka' });
   const token = tok(9);
@@ -308,6 +327,12 @@ test('Gemini przyjmuje brakujące hasło z dopasowanym źródłem bez zatrzymywa
   env.DB.raw.prepare('INSERT INTO days (day, prompts) VALUES (?, ?)').run(DAY, JSON.stringify(oldPromptIds));
   const original = await call(env, 'POST', '/api/run', { body: { token, name: 'Do testu' } });
   await call(env, 'POST', '/api/prompt', { body: { token } });
+  const recordCheck = env.DB.raw.prepare(
+    "INSERT INTO ai_answer_checks (prompt_id, norm, player, checked_at) SELECT 'rzeka', ?, player, ? FROM runs WHERE id = ?",
+  );
+  for (let i = 0; i < 14; i++) {
+    recordCheck.run(`wczesniejsza odpowiedz ${i}`, T0, original.json.runId);
+  }
   t.mock.method(globalThis, 'fetch', async (url, init) => {
     if (url.includes('/search/page?')) {
       return Response.json({ pages: [{ key: 'Probna_Rzeczka', title: word }] });
@@ -321,18 +346,21 @@ test('Gemini przyjmuje brakujące hasło z dopasowanym źródłem bez zatrzymywa
     ] } }] });
   });
   const checks = [];
-  const submit = () => handle(new Request('https://glebia.test/api/answer', { method: 'POST',
-    body: JSON.stringify({ token, runId: original.json.runId, idx: 0, answer: word }) }),
+  const submit = (answer = word) => handle(new Request('https://glebia.test/api/answer', { method: 'POST',
+    body: JSON.stringify({ token, runId: original.json.runId, idx: 0, answer }) }),
   env, T0 + 6000, { waitUntil: (job) => checks.push(job) });
   const pending = await (await submit()).json();
   assert.equal(pending.noEcho, true);
   assert.equal(pending.aiChecking, true);
   await Promise.all(checks);
+  const limited = await (await submit('Inna nieznana rzeczka')).json();
+  assert.equal(limited.aiChecking, false);
+  assert.equal(limited.aiLimit, true);
   const accepted = await (await submit()).json();
   assert.equal(accepted.result.shown, word);
   assert.equal(accepted.result.source, 'https://pl.wikipedia.org/wiki/Probna_Rzeczka');
   assert.equal(checks.length, 1);
-  assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM ai_answer_checks').get().n, 1);
+  assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM ai_answer_checks').get().n, 15);
 });
 
 test('wznowienie biegu rankingowego nie zużywa podejścia ani nie zmienia pseudonimu', async () => {

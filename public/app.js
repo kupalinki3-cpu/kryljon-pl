@@ -411,9 +411,11 @@ async function submit(auto = false) {
       input.value = '';
       input.focus();
       if (r.empty) return setHint('Wpisz odpowiedź.', true);
-      setHint(r.aiChecking
-        ? 'Gemini sprawdza odpowiedź. Możesz spróbować innej albo wrócić do tej za chwilę.'
-        : `Brak echa dla „${r.raw}”. Spróbuj jeszcze raz.`, true);
+      let hint = `Brak echa dla „${r.raw}”. Spróbuj jeszcze raz.`;
+      if (r.categoryHint) hint = `„${r.raw}” pasuje do innej kategorii (${r.categoryHint}). Spróbuj jeszcze raz.`;
+      else if (r.aiChecking) hint = 'Gemini sprawdza odpowiedź. Możesz spróbować innej albo wrócić do tej za chwilę.';
+      else if (r.aiLimit) hint = 'Dzienny limit sprawdzeń Gemini jest wykorzystany. Spróbuj innej odpowiedzi.';
+      setHint(hint, true);
       scene.ping();
       sfx.noEcho();
       input.classList.remove('shake');

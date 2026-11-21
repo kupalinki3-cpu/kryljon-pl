@@ -24,6 +24,10 @@ import {
 
 const PROMPT_BY_ID = new Map(PROMPTS.map((p) => [p.id, p]));
 buildIndex(PROMPT_BY_ID.get('nazwisko')); // duży wykaz PESEL indeksujemy przy starcie Workera
+const RELATED_CATEGORIES = new Map([
+  ['piosenkarz', { id: 'zespol', label: 'zespół muzyczny' }],
+  ['program', { id: 'serial', label: 'serial telewizyjny' }],
+]);
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,64}$/;
 const MAX_BODY = 2048;
 
@@ -365,6 +369,10 @@ async function handleAnswer(request, env, now, ctx) {
     : matchAnswer(prompt, raw);
 
   if (!match) {
+    const related = RELATED_CATEGORIES.get(prompt.id);
+    if (related && buildIndex(PROMPT_BY_ID.get(related.id)).map.has(norm)) {
+      return json({ noEcho: true, raw, categoryHint: related.label });
+    }
     // Brak echa: odpowiedzi nie ma w bazie. Pytanie trwa dalej, zegar się nie zatrzymuje, gracz próbuje jeszcze raz.
     const prev = await env.DB.prepare('SELECT COUNT(*) AS n FROM misses WHERE run_id = ? AND idx = ?')
       .bind(run.id, run.idx)
@@ -373,13 +381,14 @@ async function handleAnswer(request, env, now, ctx) {
     await env.DB.prepare('INSERT INTO misses (run_id, idx, prompt_id, raw, norm, created_at) VALUES (?, ?, ?, ?, ?, ?)')
       .bind(run.id, run.idx, prompt.id, raw, norm, now)
       .run();
-    const aiChecking = !!(env.GEMINI_API_KEY && ctx && await reserveAiCheck(env, run.player, prompt.id, norm, raw, now));
+    const aiStatus = env.GEMINI_API_KEY && ctx && await reserveAiCheck(env, run.player, prompt.id, norm, raw, now);
+    const aiChecking = aiStatus === 'checking';
     if (aiChecking) {
       ctx.waitUntil(checkWithGemini(env, prompt, norm, now).catch(() => {
         console.warn('Weryfikacja Gemini chwilowo niedostępna');
       }));
     }
-    return json({ noEcho: true, raw, tries: prev.n + 1, maxTries: MAX_MISSES, aiChecking });
+    return json({ noEcho: true, raw, tries: prev.n + 1, maxTries: MAX_MISSES, aiChecking, aiLimit: aiStatus === 'limit' });
   }
 
   const pop = await popularity(env, prompt.id, now);
