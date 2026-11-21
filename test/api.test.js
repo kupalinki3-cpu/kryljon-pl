@@ -444,3 +444,31 @@ test('pytanie o polskie napoje zalicza kompot i jego domowe warianty', async () 
   assert.equal(answer.json.result.shown, 'Kompot');
   assert.ok(answer.json.result.meters > 0);
 });
+
+test('pytanie o polskie przekąski zalicza marki i nazwy ich przekąsek', async () => {
+  const env = setup();
+  const ids = ['slodycze', ...PROMPTS.filter((p) => p.id !== 'slodycze').slice(0, PROMPTS_PER_DAY - 1).map((p) => p.id)];
+  env.DB.raw.prepare('INSERT INTO days (day, prompts) VALUES (?, ?)').run(DAY, JSON.stringify(ids));
+  const cases = [
+    ['Tymbark', 'Tymbark'],
+    ['mus Tymbark', 'Tymbark'],
+    ['Tarczyński', 'Tarczyński'],
+    ['kabanosy Tarczynski', 'Tarczyński'],
+    ['Dobra Kaloria', 'Dobra Kaloria'],
+    ['Lajkonik', 'Lajkonik'],
+  ];
+  for (const [i, [raw, shown]] of cases.entries()) {
+    const token = tok(i + 1);
+    const run = await call(env, 'POST', '/api/run', { body: { token, name: 'Gracz ' + (i + 1) } });
+    assert.equal(run.status, 200);
+    const prompt = await call(env, 'POST', '/api/prompt', { body: { token } });
+    assert.match(prompt.json.text, /przekąski/);
+    const answer = await call(env, 'POST', '/api/answer', {
+      body: { token, idx: 0, answer: raw },
+      now: T0 + INTRO_MS + 1500,
+    });
+    assert.equal(answer.status, 200, raw);
+    assert.equal(answer.json.result?.shown, shown, raw);
+    assert.ok(answer.json.result.meters > 0, raw);
+  }
+});
