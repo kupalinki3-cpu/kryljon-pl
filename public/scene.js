@@ -41,20 +41,10 @@ function sprite(w, h, draw) {
   }, x);
   return c;
 }
-// Kadry z oryginalnej planszy mają ciemnogranatowe tło. Kluczujemy je po kolorze,
-// a ilustracje zostają w oryginalnym pliku.
-function artSprite(image, rect, width, height, opaque) {
+function artSprite(image, rect, width, height) {
   return sprite(width, height, (_r, ctx) => {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(image, ...rect, 0, 0, width, height);
-    if (!opaque) return;
-    const frame = ctx.getImageData(0, 0, width, height);
-    const pixels = frame.data;
-    for (let i = 0; i < pixels.length; i += 4) {
-      const [red, green, blue] = [pixels[i], pixels[i + 1], pixels[i + 2]];
-      if (red < 24 && green < 27 && blue < 61) pixels[i + 3] = 0;
-    }
-    ctx.putImageData(frame, 0, 0);
   });
 }
 
@@ -394,19 +384,21 @@ export function createScene(canvas, { onFrame } = {}) {
     image.onload = () => { onLoad(image); dirty = true; };
     image.src = new URL(file, import.meta.url);
   };
+  loadArt('./art/kryl-i-zabnica.png', (image) => {
+    krillArt = artSprite(image, [0, 0, 24, 18], 24, 18);
+    anglerArt = artSprite(image, [24, 0, 65, 46], 65, 46);
+  });
   loadArt('./art/glebiny.png', (image) => {
-    krillArt = artSprite(image, [77, 145, 565, 420], 24, 18, true);
-    anglerArt = artSprite(image, [1488, 95, 665, 472], 65, 46, true);
-    cave = artSprite(image, [724, 5, 724, 714], 230, 227, false);
+    cave = artSprite(image, [724, 5, 724, 714], 230, 227);
   });
   loadArt('./art/morze.png', (image) => {
-    kelp = artSprite(image, [765, 12, 387, 573], 24, 36, false);
-    coral = artSprite(image, [34, 731, 568, 385], 48, 33, false);
-    trawler = artSprite(image, [677, 698, 565, 410], 64, 46, false);
+    kelp = artSprite(image, [765, 12, 387, 573], 24, 36);
+    coral = artSprite(image, [34, 731, 568, 385], 48, 33);
+    trawler = artSprite(image, [677, 698, 565, 410], 64, 46);
   });
   loadArt('./art/stworzenia.png', (image) => {
-    jellyArt = artSprite(image, [65, 638, 484, 596], 23, 29, false);
-    isopodArt = artSprite(image, [631, 734, 615, 391], 43, 27, false);
+    jellyArt = artSprite(image, [65, 638, 484, 596], 23, 29);
+    isopodArt = artSprite(image, [631, 734, 615, 391], 43, 27);
   });
   let nextBubble = 0;
   let lastNow = 0;
